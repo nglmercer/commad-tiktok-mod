@@ -1,0 +1,70 @@
+{
+    "repository": "hernan-lc/commandclient",
+    "workflow": "Build",
+    "branch": "main",
+    "runId": 33278509806,
+    "runUrl": "https://github.com/hernan-lc/commandclient/actions/runs/33278509806",
+    "runConclusion": "success",
+    "runStatus": "completed",
+    "headSha": "5fdc9e8db66de78e9e21e6d37082747c394b65eb",
+    "createdAt": "2026-08-29T22:24:22Z",
+    "aggregateConclusion": "success",
+    "targets": {
+        "26.2": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "26.1": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "1.21.11": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "1.21.8": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "1.21.4": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "1.21.1": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "1.20.6": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "1.20.4": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "1.20.1": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "1.19.4": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "1.19.2": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "1.18.2": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "1.16.5": {
+            "conclusion": "success",
+            "verified": true
+        },
+        "1.16.1": {
+            "conclusion": "success",
+            "verified": true
+        }
+    }
+}

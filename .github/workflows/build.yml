@@ -1,0 +1,189 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The matrix is derived from versions.json so version metadata is never
+  # duplicated in CI configuration.
+  targets:
+    name: Read versions.json
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.read.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: read
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          data = json.load(open("versions.json"))
+          mod_version = data["modVersion"]
+          include = []
+          for key, spec in data["versions"].items():
+              family = data["buildFamilies"][spec["buildFamily"]]
+              include.append({
+                  "id": key,
+                  "minecraft": spec["minecraft"],
+                  "module": spec["module"],
+                  "java": str(spec["buildJava"]),
+                  "jarTask": family["productionJarTask"],
+                  "buildFamily": spec["buildFamily"],
+                  "artifact": f"commandapi-{mod_version}+mc{spec['minecraft']}.jar",
+              })
+          print("matrix=" + json.dumps(include))
+          PY
+      - name: Show targets
+        run: echo '${{ steps.read.outputs.matrix }}' | python3 -m json.tool
+
+  shared:
+    name: Shared core tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Unit tests
+        run: ./gradlew :common:test
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Example client credential-scoping integration test
+        run: node --test docs/example-client.test.js
+
+      - name: Fail if shared code imports Minecraft or Fabric
+        run: |
+          if grep -rn "net\.minecraft\|net\.fabricmc" common/src/main/java; then
+            echo "::error::common/ must not depend on Minecraft or Fabric APIs"
+            exit 1
+          fi
+          echo "common/ is free of Minecraft and Fabric imports"
+
+  server:
+    name: Paper/Spigot legacy and modern tests and packaging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Build, test against both APIs, and verify both JARs
+        run: ./gradlew :server-adapter:build collectServerArtifact
+      - uses: actions/upload-artifact@v7
+        with:
+          name: commandapi-server
+          path: build/server-distributions
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: commandapi-server-test-reports
+          path: |
+            server-adapter/build/test-results/test
+            server-adapter/build/test-results/legacyTest
+
+  build:
+    name: Minecraft ${{ matrix.target.minecraft }}
+    needs: targets
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.targets.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.target.java }}
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Build (${{ matrix.target.buildFamily }} -> ${{ matrix.target.jarTask }})
+        run: ./gradlew :${{ matrix.target.module }}:build
+
+      - name: Verify the production JAR exists with the expected name
+        run: |
+          JAR="versions/${{ matrix.target.id }}/build/libs/${{ matrix.target.artifact }}"
+          if [ ! -f "$JAR" ]; then
+            echo "::error title=Minecraft ${{ matrix.target.minecraft }}::expected $JAR but it was not produced"
+            ls -la "versions/${{ matrix.target.id }}/build/libs" || true
+            exit 1
+          fi
+          echo "built $JAR"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: commandapi-mc${{ matrix.target.minecraft }}
+          path: versions/${{ matrix.target.id }}/build/libs/${{ matrix.target.artifact }}
+          if-no-files-found: error
+
+  aggregate:
+    name: Collect and verify
+    needs: [targets, shared, server, build]
+    # Runs even when a target failed, so the report names the version that broke
+    # rather than silently skipping verification.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Report per-target build results
+        run: |
+          echo "Matrix result: ${{ needs.build.result }}"
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "::warning::at least one Minecraft target failed to build; see the matrix jobs above"
+          fi
+
+      - name: Download every version artifact
+        uses: actions/download-artifact@v8
+        with:
+          path: build/distributions
+          pattern: commandapi-mc*
+          merge-multiple: true
+
+      - name: Require all build and test jobs
+        run: |
+          test '${{ needs.build.result }}' = success
+          test '${{ needs.shared.result }}' = success
+          test '${{ needs.server.result }}' = success
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: commandapi-server
+          path: build/server-distributions
+
+      - name: Verify server artifact
+        run: python3 scripts/verify-plugin.py build/server-distributions/commandapi-server-*.jar
+
+      - name: Generate manifest
+        run: python3 scripts/generate-manifest.py
+
+      # Fails when a target configured in versions.json produced no JAR, so a
+      # version can never be listed as supported without an artifact.
+      - name: Verify artifacts against versions.json
+        run: python3 scripts/verify-builds.py
+
+      - name: Check the generated version tables are committed
+        run: python3 scripts/generate-version-table.py --check
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: commandapi-all-versions
+          path: build/distributions
+          if-no-files-found: error

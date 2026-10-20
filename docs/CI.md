@@ -1,0 +1,114 @@
+# Continuous integration
+
+## Workflows
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `.github/workflows/build.yml` | push to `main`, PRs, manual | Shared tests, then one matrix job per Minecraft target, then aggregate verification |
+| `.github/workflows/release.yml` | tag `v*`/`V*`, published release, manual | Builds every target in one run and publishes the release |
+
+The build matrix is generated from `versions.json` by the `targets` job, so
+adding a Minecraft version adds a CI job automatically. Nothing about a version
+is duplicated in workflow YAML.
+
+Job layout:
+
+```
+targets ──► build (matrix: one job per Minecraft version, fail-fast: false)
+   │                     │
+shared                   ▼
+(unit tests +      aggregate  (if: always())
+ import check)      download artifacts
+                    generate manifest.json
+                    verify-builds.py         <- fails if a configured target produced no JAR
+                    generate-version-table.py --check
+```
+
+`aggregate` runs with `if: always()` on purpose: if a target fails, the job
+still runs and names the missing version instead of being skipped, so the
+failure report is specific.
+
+## Release workflow
+
+The release job resolves one tag (published release, manual input, or pushed
+tag), checks that the tag names `modVersion` before it spends minutes on a
+build, then checks that tag out so the published artifacts always come from
+the released commit. The `v` prefix of the tag may be upper or lower case;
+the version after it must equal `modVersion` exactly. See
+[releasing](RELEASING.md).
+
+Publishing a release in the web UI pushes the tag *and* fires a release
+event, which starts the workflow twice for the same tag. The `concurrency`
+group `release-<tag>` keeps one run per tag: the queued run takes over and
+the running one is stopped, so the release is built and published once.
+
+## Recorded CI evidence
+
+`ci-status.json` currently records a historical run from the
+`hernan-lc/commandclient` fork. The generated version table labels this
+**Prior CI run** and prints its commit. Those results show which targets built
+in that run; they do not verify the current source or release.
+
+First green matrix there:
+[run 33277870501](https://github.com/hernan-lc/commandclient/actions/runs/33277870501) —
+all 14 Minecraft targets built, including 26.1/26.2 on Java 25 and 1.16.x on
+Java 8, plus the shared tests and the Minecraft-import gate.
+
+## Recording a prior CI run
+
+```bash
+python3 scripts/fetch-ci-status.py --repo hernan-lc/commandclient
+python3 scripts/generate-version-table.py
+git commit -am "docs: record CI verification"
+```
+
+`--repo` matters: without it the script reads the origin remote. The generator
+marks a target as built in the prior CI run only if
+`ci-status.json` says a matrix job for it concluded `success`; a local build
+can never set that column.
+
+`ci-status.json` is committed, so the tables regenerate identically from a
+clean checkout and `--check` behaves the same locally and on a runner. Refresh
+it and regenerate when a newer run is available.
+
+## Verifying the workflows without runners
+
+The YAML parses and the job graph is checked structurally, but neither proves
+GitHub accepts it. The parts that do not need a runner:
+
+```bash
+# The matrix generator is plain Python; run the same code CI runs.
+python3 - <<'PY'
+import json
+data = json.load(open("versions.json"))
+mod = data["modVersion"]
+print(json.dumps([{
+    "id": k, "minecraft": s["minecraft"], "module": s["module"],
+    "java": str(s["buildJava"]),
+    "jarTask": data["buildFamilies"][s["buildFamily"]]["productionJarTask"],
+    "artifact": f"commandapi-{mod}+mc{s['minecraft']}.jar",
+} for k, s in data["versions"].items()], indent=2))
+PY
+
+# The aggregate job's steps, run locally against a real build:
+./gradlew buildAllVersions
+python3 scripts/generate-manifest.py
+python3 scripts/verify-builds.py
+python3 scripts/generate-version-table.py --check
+```
+
+Those four commands exercise the aggregate logic locally. A green local run
+does not mark a target as verified by CI.
+
+## Server adapter validation
+
+The Build workflow has a separate server job for unit/HTTP/Bukkit lifecycle
+tests, packaging verification and standalone artifact upload. Aggregation
+requires shared tests, server tests and all Fabric matrix builds to succeed.
+Hosted CI does not certify runtime compatibility; see
+[implementation evidence](IMPLEMENTATION_VERIFICATION.md).
+
+The server build now compiles identical sources against both Spigot baselines
+and runs the same test suite twice (`test`, `legacyTest`). Both test reports and
+both installable artifacts are uploaded. Verification rejects a missing variant
+or any bundled class above its declared Java baseline.
