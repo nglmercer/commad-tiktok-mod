@@ -91,12 +91,137 @@ Viewer text is never interpreted as markup and never turned into a command.
 /tiktok reconnect
 /tiktok reload
 /tiktok chat on|off
-/tiktok test chat <message>
+/tiktok rules list|enable <id>|disable <id>
+/tiktok functions list|preview <id>|run <id>
+/tiktok jobs list|cancel <id>
+/tiktok test chat|gift|like|follow|share
 /tiktok debug on|off
 ```
 
-`/tiktok test chat` injects a synthetic event into the normal pipeline. It
-never contacts TikTok, so you can develop and test without going live.
+`/tiktok test` injects a synthetic event into the normal pipeline. It never
+contacts TikTok, so you can develop and test without going live.
+
+## Examples
+
+### Every 50 likes spawns a chicken
+
+Minecraft has no vanilla duck, so this example spawns a chicken. A duck
+needs a custom mob mod that is installed on the server.
+
+`plugins/TikTokMinecraft/events/likes.yml`:
+
+```yaml
+rules:
+  - id: chicken-on-50-likes
+    enabled: true
+    trigger: like
+
+    aggregate:
+      metric: count
+      scope: global
+      threshold: 50
+      carry-remainder: true
+
+    actions:
+      - type: function
+        name: gifts:spawn_chicken
+```
+
+`plugins/TikTokMinecraft/functions/gifts/spawn_chicken.json`:
+
+```json
+{
+  "schemaVersion": 1,
+  "name": "gifts:spawn_chicken",
+  "steps": [
+    { "type": "summon", "entity": "minecraft:chicken", "position": "~ ~1 ~" }
+  ]
+}
+```
+
+The counter adds the likes each event carries, never the room's cumulative
+total, so the same likes are never counted twice.
+
+### A rose gift spawns a zombie
+
+`plugins/TikTokMinecraft/events/gifts.yml`:
+
+```yaml
+rules:
+  - id: rose-zombie
+    enabled: true
+    trigger: gift.final
+
+    match:
+      gift-name: "Rose"
+
+    cooldown:
+      duration: 2s
+      scope: user
+
+    actions:
+      - type: function
+        name: gifts:spawn_zombies
+        args:
+          count: 1
+```
+
+`gift.final` fires once when a streak is complete, so the action runs once
+per streak and not once per repetition. Match on `gift-id` instead of
+`gift-name` in production: a name is localized and can change.
+
+### A chat command shows a message
+
+`plugins/TikTokMinecraft/events/chat.yml`:
+
+```yaml
+rules:
+  - id: chat-hello
+    enabled: true
+    trigger: chat
+
+    match:
+      text:
+        equals-ignore-case: "!hello"
+
+    cooldown:
+      duration: 10s
+      scope: user
+
+    actions:
+      - type: broadcast
+        message: "Hello from TikTok!"
+```
+
+A viewer who writes `!hello` in the TikTok chat sees the message in
+Minecraft. The cooldown is per viewer and belongs to this rule, so it never
+silences another rule.
+
+More complete examples are in [examples/](examples/).
+
+## Documentation
+
+| Document | What is in it |
+|---|---|
+| [Installation](docs/INSTALLATION.md) | Requirements, the first start, troubleshooting. |
+| [Configuration](docs/CONFIGURATION.md) | Every setting in `config.yml`. |
+| [Events](docs/EVENTS.md) | The triggers, the fields, the rules and the actions. |
+| [Functions](docs/FUNCTIONS.md) | The function format, the parameters and the execution rules. |
+| [The DSL](docs/DSL.md) | The optional `.ttl` rule format. |
+| [Security](docs/SECURITY.md) | The threat model and the limits. |
+| [Development](docs/DEVELOPMENT.md) | Building, the SDK, the packaging checks. |
+
+## Known limitations
+
+* Paper 1.21.11 and Java 21 are the only tested combination. Paper 26.x and
+  Java 25 are not verified yet, and Folia is not supported.
+* The plugin talks to TikTok's public LIVE protocol. TikTok changes that
+  protocol from time to time; when it changes, the SDK has to follow.
+* A room that is flooded can hit the ingest rate limit. The limit is
+  reported by `/tiktok status` and can be raised in `config.yml`.
+* The first start needs internet access, because Paper downloads the GraalJS
+  runtime. See [Installation](docs/INSTALLATION.md).
+
 
 ## Security defaults
 

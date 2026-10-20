@@ -25,6 +25,10 @@ public final class RuleEngine {
     private final CooldownStore cooldowns = new CooldownStore(8192);
     private final ThresholdCounter counters = new ThresholdCounter(4096);
     private final Map<String, Boolean> overrides = new ConcurrentHashMap<String, Boolean>();
+    private final java.util.concurrent.atomic.AtomicLong actionsExecuted =
+            new java.util.concurrent.atomic.AtomicLong();
+    private final java.util.concurrent.atomic.AtomicLong rejected =
+            new java.util.concurrent.atomic.AtomicLong();
     private volatile RulesSnapshot snapshot = RulesSnapshot.empty();
 
     public RuleEngine(ActionRegistry registry) {
@@ -136,23 +140,30 @@ public final class RuleEngine {
         int executed = 0;
         for (ActionSpec spec : rule.actions()) {
             if (!context.consumeActionSlot()) {
+                rejected.incrementAndGet();
                 break;
             }
             dev.nglmercer.tiktokminecraft.actions.Action action = registry.get(spec.type());
             if (action == null) {
+                rejected.incrementAndGet();
                 continue;
             }
             try {
                 ActionResult result = action.execute(spec, context);
                 if (result.isSuccess()) {
                     executed++;
+                    actionsExecuted.incrementAndGet();
+                } else {
+                    rejected.incrementAndGet();
                 }
                 context.log().debug(LogCategory.ACTIONS,
                         rule.id() + " -> " + spec.type() + ": " + result);
             } catch (dev.nglmercer.tiktokminecraft.actions.ActionException failure) {
+                rejected.incrementAndGet();
                 context.log().warn(LogCategory.ACTIONS,
                         rule.id() + " -> " + spec.type() + " failed: " + failure.getMessage());
             } catch (RuntimeException failure) {
+                rejected.incrementAndGet();
                 context.log().warn(LogCategory.ACTIONS,
                         rule.id() + " -> " + spec.type() + " failed: " + failure.getMessage());
             }
@@ -168,6 +179,16 @@ public final class RuleEngine {
 
     public int cooldownKeys() {
         return cooldowns.size();
+    }
+
+    /** The number of actions that ran. */
+    public long actionsExecuted() {
+        return actionsExecuted.get();
+    }
+
+    /** The number of actions that were skipped or failed. */
+    public long actionsRejected() {
+        return rejected.get();
     }
 
     public int counterKeys() {

@@ -19,13 +19,12 @@ public final class ParticleAction extends Action {
     @Override
     public void validate(ActionSpec spec, ActionContext context) throws ActionException {
         String particle = require(spec, "particle");
-        NamespacedKey key = key(particle);
-        if (key == null) {
+        if (key(particle) == null) {
             throw new ActionException("'particle' is not a valid particle name");
         }
-        if (Registry.PARTICLE_TYPE.get(key) == null) {
-            throw new ActionException("Unknown particle: " + particle);
-        }
+        // The name is checked here; whether the particle exists in this
+        // Minecraft version is checked when the action runs, so a rule that
+        // names a particle from a newer version still loads.
         int count = optionalInt(spec, "count", 20);
         if (count < 1 || count > 10000) {
             throw new ActionException("'count' must be between 1 and 10000");
@@ -35,13 +34,14 @@ public final class ParticleAction extends Action {
     @Override
     public ActionResult execute(ActionSpec spec, ActionContext context)
             throws ActionException {
-        NamespacedKey key = key(spec.string("particle", ""));
+        String name = spec.string("particle", "");
+        NamespacedKey key = key(name);
         if (key == null) {
             return ActionResult.failed("Invalid particle");
         }
         Particle particle = Registry.PARTICLE_TYPE.get(key);
         if (particle == null) {
-            return ActionResult.failed("Unknown particle");
+            return ActionResult.failed("Unknown particle: " + name);
         }
         String target = optional(spec, "target", null);
         List<Player> players = context.targets(target);

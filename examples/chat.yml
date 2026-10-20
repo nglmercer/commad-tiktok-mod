@@ -1,0 +1,62 @@
+# Example chat rules.
+#
+# Copy this file into plugins/TikTokMinecraft/events/ to use it.
+#
+# A rule matches a normalized TikTok event and runs its actions. The trigger
+# 'chat' fires for every chat message. Matching is exact and typed; no
+# expression is ever evaluated.
+
+rules:
+  # A viewer who says "!hello" gets a welcome message.
+  - id: chat-hello
+    enabled: false
+    trigger: chat
+
+    match:
+      text:
+        equals-ignore-case: "!hello"
+
+    cooldown:
+      duration: 10s
+      scope: user
+
+    actions:
+      - type: broadcast
+        message: "Hello from TikTok!"
+
+  # A viewer who says "!lvl" gets a title.
+  - id: chat-level
+    enabled: false
+    trigger: chat
+
+    match:
+      text:
+        equals-ignore-case: "!lvl"
+
+    cooldown:
+      duration: 10s
+      scope: user
+
+    actions:
+      - type: title
+        target: nearest-online
+        title: "Level up!"
+        subtitle: "Keep going"
+
+  # A viewer who mentions the word "gift" hears a sound.
+  - id: chat-gift-sound
+    enabled: false
+    trigger: chat
+
+    match:
+      text:
+        contains: "gift"
+
+    cooldown:
+      duration: 30s
+      scope: user
+
+    actions:
+      - type: sound
+        sound: minecraft:block.note_block.bell
+        target: nearest-online

@@ -26,13 +26,12 @@ public final class SpawnEntityAction extends Action {
     @Override
     public void validate(ActionSpec spec, ActionContext context) throws ActionException {
         String entity = require(spec, "entity");
-        NamespacedKey key = key(entity);
-        if (key == null) {
+        if (key(entity) == null) {
             throw new ActionException("'entity' is not a valid entity type");
         }
-        if (Registry.ENTITY_TYPE.get(key) == null) {
-            throw new ActionException("Unknown entity type: " + entity);
-        }
+        // Whether the entity exists in this Minecraft version is checked when
+        // the action runs, so a rule that names an entity from a newer
+        // version still loads.
         int count = optionalInt(spec, "count", 1);
         if (count < 1) {
             throw new ActionException("'count' must be at least 1");

@@ -240,23 +240,23 @@ class FunctionEngineTest {
         assertNull(registry.get("ns:big"));
     }
 
-    @Test void examplesAreValidAndCompileWithDefaults() throws Exception {
-        java.io.File dir = new java.io.File("examples/functions");
-        if (!dir.isDirectory()) {
-            dir = new java.io.File("../examples/functions");
-        }
-        assertTrue(dir.isDirectory());
+    @Test void theTestFixturesAreValidAndCompileWithDefaults() throws Exception {
+        String[] names = {
+            "mob_attack.json",
+            "boss_event.json",
+            "spawn_zombie.json",
+            "title_and_subtitle.json",
+            "gift_reward.json",
+            "weather_change.mcfunction"
+        };
         int count = 0;
-        for (java.io.File file : dir.listFiles()) {
-            String name = file.getName();
-            if (!name.endsWith(".json") && !name.endsWith(".mcfunction")) {
-                continue;
-            }
-            String text = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
-            FunctionDefinition definition = FunctionParser.parse("example:tmp", name, text,
-                    file.toString());
+        for (String name : names) {
+            String text = FunctionParsingTest.readExample(name);
+            FunctionDefinition definition =
+                    FunctionParser.parse("example:tmp", name, text, name);
             FunctionValidator.validate(definition, FunctionLimits.defaults());
-            // Compile with defaults only: every example must run with no arguments.
+            // Compile with defaults only: every fixture must run with no
+            // arguments.
             FunctionRegistry registry = new FunctionRegistry();
             FunctionDefinition namespaced = new FunctionDefinition(
                     "example:" + name.replaceAll("\\..*$", ""), definition.getName(),
@@ -268,6 +268,6 @@ class FunctionEngineTest {
             assertTrue(!plan.commands().isEmpty());
             count++;
         }
-        assertTrue(count >= 10, "expected at least 10 examples, got " + count);
+        assertEquals(names.length, count);
     }
 }

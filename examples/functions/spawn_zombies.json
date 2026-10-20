@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "name": "gifts:spawn_zombies",
+  "description": "Spawn a limited number of zombies next to the target player.",
+  "parameters": {
+    "count": {
+      "type": "integer",
+      "min": 1,
+      "max": 5,
+      "default": 1
+    }
+  },
+  "steps": [
+    {
+      "type": "repeat",
+      "times": "${count}",
+      "steps": [
+        {
+          "type": "summon",
+          "entity": "minecraft:zombie",
+          "position": "~ ~1 ~"
+        }
+      ]
+    },
+    {
+      "type": "title",
+      "target": "@a",
+      "title": "Zombie Attack!",
+      "subtitle": "A TikTok viewer summoned zombies!"
+    }
+  ]
+}

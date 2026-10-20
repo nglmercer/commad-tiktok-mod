@@ -85,6 +85,8 @@ public final class FunctionJobManager implements AutoCloseable {
     private final PluginLog log;
     private final ThreadPoolExecutor workers;
     private final Map<String, Job> jobs = new ConcurrentHashMap<String, Job>();
+    private final java.util.concurrent.atomic.AtomicLong failed =
+            new java.util.concurrent.atomic.AtomicLong();
 
     public FunctionJobManager(
             Plugin plugin,
@@ -234,6 +236,7 @@ public final class FunctionJobManager implements AutoCloseable {
             CompletableFuture<FunctionResult> future) {
         job.state = "failed";
         job.lastError = message;
+        failed.incrementAndGet();
         future.complete(
                 new FunctionResult(
                         functionId,
@@ -264,6 +267,11 @@ public final class FunctionJobManager implements AutoCloseable {
 
     public int activeCount() {
         return jobs.size();
+    }
+
+    /** The number of runs that failed. */
+    public long failedCount() {
+        return failed.get();
     }
 
     /** Cancels a job. */

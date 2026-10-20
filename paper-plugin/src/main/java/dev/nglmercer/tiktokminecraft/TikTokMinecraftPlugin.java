@@ -334,6 +334,10 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
         copyDefault("defaults/events/social.yml", "events/social.yml");
         copyDefault("defaults/events/members.yml", "events/members.yml");
         copyDefault("defaults/functions/effects/welcome.json", "functions/effects/welcome.json");
+        copyDefault("defaults/functions/gifts/spawn_zombies.json",
+                "functions/gifts/spawn_zombies.json");
+        copyDefault("defaults/functions/gifts/spawn_chicken.json",
+                "functions/gifts/spawn_chicken.json");
         copyDefault("defaults/scripts/example.ttl", "scripts/example.ttl");
     }
 

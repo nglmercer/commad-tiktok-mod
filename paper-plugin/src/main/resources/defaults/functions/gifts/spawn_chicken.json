@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "name": "gifts:spawn_chicken",
+  "description": "Spawn a chicken next to the target player.",
+  "steps": [
+    {
+      "type": "summon",
+      "entity": "minecraft:chicken",
+      "position": "~ ~1 ~"
+    },
+    {
+      "type": "sound",
+      "sound": "minecraft:entity.chicken.ambient",
+      "target": "@a"
+    }
+  ]
+}

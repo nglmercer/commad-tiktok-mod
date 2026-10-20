@@ -129,11 +129,20 @@ class FunctionParsingTest {
         assertThrows(FunctionException.class, () -> registry.register(definition));
     }
 
+    /**
+     * Reads a test fixture.
+     *
+     * <p>The fixtures live in the module's own test resources, so this module
+     * does not depend on the examples of the plugin.</p>
+     */
     static String readExample(String name) throws Exception {
-        java.nio.file.Path path = new java.io.File("examples/functions/" + name).toPath();
-        if (!java.nio.file.Files.isRegularFile(path)) {
-            path = new java.io.File("../examples/functions/" + name).toPath();
+        java.io.InputStream stream =
+                FunctionParsingTest.class.getResourceAsStream("/functions/" + name);
+        if (stream == null) {
+            throw new java.io.FileNotFoundException("/functions/" + name);
         }
-        return new String(java.nio.file.Files.readAllBytes(path), "UTF-8");
+        try (java.io.InputStream input = stream) {
+            return new String(input.readAllBytes(), "UTF-8");
+        }
     }
 }

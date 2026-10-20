@@ -19,9 +19,11 @@ public final class EffectAction extends Action {
     @Override
     public void validate(ActionSpec spec, ActionContext context) throws ActionException {
         String effect = require(spec, "effect");
-        if (resolve(effect) == null) {
-            throw new ActionException("Unknown potion effect: " + effect);
+        if (!effect.matches("[A-Za-z0-9_.:/-]{1,128}")) {
+            throw new ActionException("'effect' is not a valid potion effect name");
         }
+        // Whether the effect exists in this Minecraft version is checked when
+        // the action runs.
         int duration = optionalInt(spec, "duration", 5);
         if (duration < 1 || duration > 3600) {
             throw new ActionException("'duration' must be between 1 and 3600 seconds");

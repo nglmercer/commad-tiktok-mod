@@ -164,10 +164,16 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
                 ? 0 : owner.eventBus().queued()));
         sender.sendMessage("  Matched Rules: " + matchedRules);
         sender.sendMessage("  Rules Loaded: " + owner.rules().size());
+        sender.sendMessage("  Actions Executed: " + (owner.ruleEngine() == null
+                ? 0 : owner.ruleEngine().actionsExecuted()));
+        sender.sendMessage("  Actions Rejected: " + (owner.ruleEngine() == null
+                ? 0 : owner.ruleEngine().actionsRejected()));
         sender.sendMessage("  Functions Loaded: " + (owner.functionEngine() == null
                 ? 0 : owner.functionEngine().list().size()));
         sender.sendMessage("  Active Jobs: " + (owner.functionEngine() == null
                 ? 0 : owner.functionEngine().jobs().activeCount()));
+        sender.sendMessage("  Functions Failed: " + (owner.functionEngine() == null
+                ? 0 : owner.functionEngine().jobs().failedCount()));
         sender.sendMessage("  Queued Actions: " + (owner.commandDispatcher() == null
                 ? 0 : owner.commandDispatcher().queued()));
         sender.sendMessage("  Reconnect Attempts: " + (owner.liveService() == null
