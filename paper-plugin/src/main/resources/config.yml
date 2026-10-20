@@ -1,0 +1,92 @@
+# TikTokMinecraft configuration.
+#
+# Every value is validated when the file is loaded. A reload that fails
+# validation keeps the previous, working configuration.
+
+tiktok:
+  # The TikTok username of the creator to watch. The leading @ is optional.
+  unique-id: "@elpadredomingooficial"
+  # Connect as soon as the plugin starts.
+  auto-connect: true
+  # Retry automatically after a connection failure.
+  reconnect: true
+  # Download the gift catalog so gifts can be matched by their exact id.
+  fetch-gifts: true
+  # Ignore the room's history replay instead of acting on it.
+  ignore-history: true
+
+chat:
+  enabled: true
+  # Print every chat message to the server console.
+  console: true
+  # Mirror every chat message into Minecraft chat.
+  minecraft: true
+  prefix: "[TikTok]"
+  max-length: 200
+  # Ingest rate limit, in messages per second. Anything above it is suppressed
+  # and reported by /tiktok status.
+  messages-per-second: 5
+  # Maximum number of messages waiting to be broadcast.
+  max-queue: 128
+
+events:
+  enabled: true
+  # When true, a rule that does not say otherwise is enabled.
+  default-enabled: false
+  # How long an event identifier is remembered for deduplication.
+  deduplication-window-seconds: 300
+  # Maximum number of events waiting to be processed.
+  max-pending-events: 512
+  # Historical events never trigger world-changing actions.
+  ignore-history: true
+
+functions:
+  enabled: true
+  # Functions run at most this many at the same time.
+  max-concurrent: 2
+  # Functions waiting to run.
+  max-queued: 64
+  # Minecraft commands executed per server tick across all running functions.
+  max-commands-per-tick: 4
+  # Wall-clock budget for a single function run.
+  max-execution-seconds: 60
+  # Maximum number of repetitions of a single step.
+  max-repeat: 20
+  # Maximum nesting depth of nested functions.
+  max-depth: 8
+  # Command roots a function may execute. Everything else is rejected.
+  allowed-commands:
+    - summon
+    - title
+    - playsound
+    - particle
+    - effect
+
+actions:
+  # Where an action looks for its target player:
+  # all-online, random-online, nearest-online, specific-player, specific-world
+  target-policy: nearest-online
+  # What to do when no player is eligible: skip or console
+  no-player-policy: skip
+  # Entity spawning limits.
+  max-entities-per-event: 5
+  max-entities-per-minute: 60
+  # Entity types an action may spawn. Empty denies all entity spawning.
+  allowed-entities: []
+
+security:
+  # Master switch for actions triggered by a live event. Keep it false until
+  # the rules and functions have been tested.
+  execute-live-actions: false
+  # Allow actions to run console commands.
+  allow-console-commands: false
+  # Allow raw command actions.
+  allow-raw-commands: false
+
+debug:
+  # Log every received event.
+  log-events: false
+  # Log connection state changes.
+  log-connection: true
+  # Log every rule that matched.
+  log-rule-matches: false

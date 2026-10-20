@@ -1,0 +1,30 @@
+name: TikTokMinecraft
+version: '${version}'
+main: dev.nglmercer.tiktokminecraft.TikTokMinecraftPlugin
+api-version: '1.21.11'
+description: Connects a Minecraft server to a TikTok LIVE creator and turns LIVE events into bounded, configurable actions.
+authors: [ nglmercer ]
+website: https://github.com/nglmercer/commad-tiktok-mod
+
+# GraalJS is used by the TikTok SDK's embedded signer. It is loaded by Paper's
+# own library loader from Maven Central, so the first start of the server
+# needs internet access; afterwards it is cached in the server's 'libraries'
+# directory.
+libraries:
+  - org.graalvm.polyglot:polyglot:${graalJsVersion}
+  - org.graalvm.js:js-language:${graalJsVersion}
+  - org.graalvm.truffle:truffle-runtime:${graalJsVersion}
+
+commands:
+  tiktok:
+    description: Manage TikTok LIVE integration
+    usage: /tiktok help
+    permission: tiktokminecraft.admin
+
+permissions:
+  tiktokminecraft.admin:
+    description: Full administrative control over the TikTok LIVE integration
+    default: op
+  tiktokminecraft.status:
+    description: View the connection and pipeline status
+    default: op

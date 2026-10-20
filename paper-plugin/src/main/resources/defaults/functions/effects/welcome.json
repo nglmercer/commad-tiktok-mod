@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "name": "effects:welcome",
+  "description": "Welcome the players with a title and a sound.",
+  "parameters": {
+    "title": {
+      "type": "string",
+      "default": "Welcome!"
+    }
+  },
+  "steps": [
+    {
+      "type": "title",
+      "target": "@a",
+      "title": "${title}",
+      "subtitle": "Welcome to the server!"
+    },
+    {
+      "type": "sound",
+      "sound": "minecraft:entity.player.levelup",
+      "target": "@a"
+    }
+  ]
+}

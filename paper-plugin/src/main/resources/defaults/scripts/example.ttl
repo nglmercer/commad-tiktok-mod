@@ -1,0 +1,25 @@
+# Example TikTokMinecraft rule script.
+#
+# The DSL is optional: YAML and JSON rules are first-class. A script compiles
+# into exactly the same internal rule representation, so both formats share
+# one engine and one set of limits.
+#
+# Rules are disabled by default. Enable them with /tiktok rules enable <id>.
+
+on chat where chat.text == "!hello" {
+    cooldown 10s per user
+    broadcast "Hello from TikTok!"
+}
+
+on gift.final where gift.name == "Rose" {
+    cooldown 2s per user
+    call gifts:spawn_zombies(count = 1)
+}
+
+on like every 50 global {
+    call gifts:spawn_chicken()
+}
+
+on social.follow {
+    call effects:welcome()
+}
