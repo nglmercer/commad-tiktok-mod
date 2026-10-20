@@ -29,6 +29,22 @@ public final class FunctionRegistry {
         errors.remove(definition.getId());
     }
 
+    /**
+     * Replaces every entry with the contents of another registry.
+     *
+     * <p>Used for an atomic reload: the new set is built first and is only
+     * swapped in once it is complete.</p>
+     */
+    public synchronized void replaceAll(FunctionRegistry other) {
+        functions.clear();
+        errors.clear();
+        if (other == null) {
+            return;
+        }
+        functions.putAll(other.functions);
+        errors.putAll(other.errors);
+    }
+
     public synchronized FunctionDefinition get(String id) {
         return functions.get(id);
     }

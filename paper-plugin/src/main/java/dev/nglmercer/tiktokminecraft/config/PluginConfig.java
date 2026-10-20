@@ -93,6 +93,7 @@ public final class PluginConfig {
     // Actions
     private final TargetPolicy targetPolicy;
     private final NoPlayerPolicy noPlayerPolicy;
+    private final int maxActionsPerEvent;
     private final int maxEntitiesPerEvent;
     private final int maxEntitiesPerMinute;
     private final List<String> allowedEntities;
@@ -159,6 +160,7 @@ public final class PluginConfig {
                 NoPlayerPolicy.parse(
                         actions == null ? null : actions.getString("no-player-policy"),
                         NoPlayerPolicy.SKIP);
+        this.maxActionsPerEvent = clamp(actions, "max-actions-per-event", 8, 0, 256);
         this.maxEntitiesPerEvent = clamp(actions, "max-entities-per-event", 5, 0, 1000);
         this.maxEntitiesPerMinute = clamp(actions, "max-entities-per-minute", 60, 0, 100000);
         this.allowedEntities = readStrings(actions, "allowed-entities", new String[0]);
@@ -346,6 +348,19 @@ public final class PluginConfig {
 
     public NoPlayerPolicy noPlayerPolicy() {
         return noPlayerPolicy;
+    }
+
+    public int maxActionsPerEvent() {
+        return maxActionsPerEvent;
+    }
+
+    /**
+     * The execution limits of the function engine, derived from the
+     * configuration.
+     */
+    public dev.nglmercer.tiktokminecraft.functions.FunctionLimits functionLimits() {
+        return new dev.nglmercer.tiktokminecraft.functions.FunctionLimits(
+                256, maxRepeat, maxDepth, 1200, maxExecutionSeconds, 256L * 1024L, 32);
     }
 
     public int maxEntitiesPerEvent() {
