@@ -53,7 +53,7 @@ class MemePresetTest {
         Map<String, Map<?, ?>> rules = loadRules();
         assertEquals(13, rules.size());
 
-        assertGift(rules, "meme-rose-tnt", "5655", "prime-tnt");
+        assertGift(rules, "meme-rose-charged-creeper-cage", "5655", "block-cage");
         assertGift(rules, "meme-confetti-tnt", "5585", "prime-tnt");
         assertGift(rules, "meme-rosa-charged-creeper", "8913", "spawn-entity");
         assertGift(rules, "meme-finger-heart-webs", "5487", "place-cobweb");
@@ -70,13 +70,25 @@ class MemePresetTest {
         assertEquals(4096, firstAction(rules.get("meme-doughnut-void")).get("max-blocks"));
         assertEquals("like", rules.get("meme-likes-zombie").get("trigger"));
         assertEquals("social.share", rules.get("meme-share-apples").get("trigger"));
-        assertEquals("tnt-cage", firstAction(rules.get("meme-high-value-tnt-cage")).get("type"));
+        assertEquals("block-cage",
+                firstAction(rules.get("meme-high-value-tnt-cage")).get("type"));
+        assertEquals("minecraft:tnt",
+                firstAction(rules.get("meme-high-value-tnt-cage")).get("material"));
+        Map<?, ?> rose = firstAction(rules.get("meme-rose-charged-creeper-cage"));
+        assertEquals("minecraft:tnt", rose.get("material"));
+        assertEquals(1, rose.get("radius"));
+        assertEquals("minecraft:creeper", rose.get("occupant"));
+        assertEquals(Boolean.TRUE, rose.get("occupant-charged"));
+        assertEquals(Boolean.FALSE, rose.get("ignite"));
         assertEquals("gift.final", rules.get("meme-high-value-tnt-cage").get("trigger"));
     }
 
     @Test void theNewActionsAreRegistered() {
         ActionRegistry registry = new ActionRegistry();
         assertTrue(registry.contains("tnt-cage"));
+        assertTrue(registry.contains("block-cage"));
+        assertEquals(registry.get("tnt-cage"), registry.get("block-cage"),
+                "Cage aliases must share restoration state");
         assertTrue(registry.contains("void-shaft"));
         assertTrue(registry.contains("prime-tnt"));
     }
