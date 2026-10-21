@@ -35,9 +35,9 @@ one, writes it to `config.yml` and reconnects at once. The plugin does not
 have to be stopped and started again, and the file does not have to be
 edited by hand.
 
-Changing `unique-id` in the file and running `/tiktok reload` does the same
-thing, and a reload that changes a connection relevant setting always
-reconnects, even when the previous creator was offline.
+Changing `unique-id` in the file also reconnects automatically when hot
+reload is enabled. Use `/tiktok reload` to apply changes manually if hot
+reload is disabled. Only connection-relevant settings cause a reconnect.
 
 ## chat
 
@@ -167,12 +167,48 @@ debug:
 `/tiktok debug on` turns every diagnostic category on at runtime, and
 `/tiktok debug off` turns them off again.
 
-## Reloading
+## Automatic hot reload
 
-`/tiktok reload` re-reads the configuration, the functions and the rules. It
-validates everything first and only swaps the new set in when all of it is
-valid. A problem is reported with the file, the rule and the configuration
-path:
+File edits are detected automatically, including atomic editor saves that
+replace the original file. There is no need to restart Paper or disconnect
+from a LIVE session when adjusting gifts and rules.
+
+```yaml
+hot-reload:
+  enabled: true
+  debounce-ms: 750
+```
+
+The background watcher polls every 500 ms and waits for the files to stop
+changing for `debounce-ms` (250–5000 ms). It watches:
+
+- `config.yml`
+- `events/*.yml`
+- `functions/**/*.json` and `functions/**/*.mcfunction`
+- `scripts/**/*.ttl`
+
+New files, deletions and modifications all trigger validation. Backup files,
+editor swap files and generated `cache/` and `exports/` are ignored.
+
+**Every reload is transactional:** a malformed config, missing function
+reference, or invalid rule keeps the last working config, function registry
+and rule snapshot in use. It reports the error in the Paper console.
+Subsequent file saves retry automatically.
+
+Rules-only edits preserve deduplication state and do not restart TikTok.
+Changing the creator or gift-catalog setting causes a reconnect.
+Editing `hot-reload.enabled: false` disables further automatic reloads
+after that change is applied; run `/tiktok reload` manually to re-enable it.
+
+`/tiktok status` shows whether hot reload is enabled and the last outcome.
+The watcher is stopped when the plugin is disabled; it has no Bukkit access
+from its background scanning thread.
+
+## Manual reload
+
+`/tiktok reload` re-reads the configuration, the functions and the rules.
+It uses the same strict validation as automatic reload. A problem is
+reported with the file, the rule and the configuration path:
 
 ```text
 Reload failed; the previous configuration is still active:
