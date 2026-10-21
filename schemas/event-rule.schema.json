@@ -4,23 +4,34 @@
   "title": "TikTokMinecraft event rule file",
   "description": "The rules section of a file in plugins/TikTokMinecraft/events/.",
   "type": "object",
-  "required": ["rules"],
+  "required": [
+    "rules"
+  ],
   "properties": {
     "rules": {
       "type": "array",
-      "items": { "$ref": "#/$defs/rule" }
+      "items": {
+        "$ref": "#/$defs/rule"
+      }
     }
   },
   "$defs": {
     "rule": {
       "type": "object",
-      "required": ["id", "trigger", "actions"],
+      "required": [
+        "id",
+        "trigger",
+        "actions"
+      ],
       "properties": {
         "id": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_.-]{1,64}$"
         },
-        "enabled": { "type": "boolean", "default": true },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
         "trigger": {
           "type": "string",
           "enum": [
@@ -38,19 +49,39 @@
             "unknown"
           ]
         },
-        "priority": { "type": "integer", "minimum": -1000, "maximum": 1000 },
-        "stop-processing": { "type": "boolean", "default": false },
+        "priority": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "stop-processing": {
+          "type": "boolean",
+          "default": false
+        },
         "match": {
           "type": "object",
           "additionalProperties": {
             "oneOf": [
-              { "type": ["string", "number", "boolean"] },
-              { "type": "array" },
+              {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              },
+              {
+                "type": "array"
+              },
               {
                 "type": "object",
                 "minProperties": 1,
                 "additionalProperties": {
-                  "type": ["string", "number", "boolean", "array"]
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array"
+                  ]
                 },
                 "propertyNames": {
                   "enum": [
@@ -73,35 +104,72 @@
         },
         "aggregate": {
           "type": "object",
-          "required": ["metric", "scope", "threshold"],
+          "required": [
+            "metric",
+            "scope",
+            "threshold"
+          ],
           "properties": {
-            "metric": { "type": "string", "enum": ["count", "total"] },
-            "scope": { "type": "string", "enum": ["event", "user", "global"] },
-            "threshold": { "type": "integer", "minimum": 1, "maximum": 1000000 },
-            "carry-remainder": { "type": "boolean", "default": false }
+            "metric": {
+              "type": "string",
+              "enum": [
+                "count",
+                "total"
+              ]
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "event",
+                "user",
+                "global"
+              ]
+            },
+            "threshold": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000000
+            },
+            "carry-remainder": {
+              "type": "boolean",
+              "default": false
+            }
           },
           "additionalProperties": false
         },
         "cooldown": {
           "type": "object",
-          "required": ["duration"],
+          "required": [
+            "duration"
+          ],
           "properties": {
-            "duration": { "type": "string" },
+            "duration": {
+              "type": "string"
+            },
             "scope": {
               "type": "string",
-              "enum": ["rule", "user", "user-and-rule", "global"]
+              "enum": [
+                "rule",
+                "user",
+                "user-and-rule",
+                "global"
+              ]
             }
           },
           "additionalProperties": false
         },
         "conditions": {
           "type": "array",
-          "items": { "$ref": "#/$defs/condition" }
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
         },
         "actions": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/action" }
+          "items": {
+            "$ref": "#/$defs/action"
+          }
         }
       },
       "additionalProperties": false
@@ -111,17 +179,41 @@
       "minProperties": 1,
       "maxProperties": 1,
       "properties": {
-        "all": { "type": "array", "items": { "$ref": "#/$defs/condition" } },
-        "any": { "type": "array", "items": { "$ref": "#/$defs/condition" } },
-        "not": { "$ref": "#/$defs/condition" },
-        "field": { "type": "string" },
-        "operator": { "type": "string" },
-        "value": { "type": ["string", "number", "boolean"] }
+        "all": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
+        },
+        "any": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
+        },
+        "not": {
+          "$ref": "#/$defs/condition"
+        },
+        "field": {
+          "type": "string"
+        },
+        "operator": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        }
       }
     },
     "action": {
       "type": "object",
-      "required": ["type"],
+      "required": [
+        "type"
+      ],
       "properties": {
         "type": {
           "type": "string",
@@ -136,11 +228,79 @@
             "heal",
             "teleport",
             "function",
-            "command"
+            "command",
+            "prime-tnt",
+            "tnt-cage",
+            "block-cage",
+            "void-shaft",
+            "lightning-effect",
+            "place-cobweb",
+            "remove-item",
+            "temporary-clear-inventory"
           ]
+        },
+        "material": {
+          "type": "string",
+          "description": "Placeable Minecraft block ID for block-cage, e.g. minecraft:obsidian"
+        },
+        "radius": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 6
+        },
+        "restore-seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120
+        },
+        "ignite": {
+          "type": "boolean",
+          "description": "TNT only; delay ignition of one cage block"
+        },
+        "ignite-delay-ticks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "fuse-ticks": {
+          "type": "integer",
+          "minimum": 20,
+          "maximum": 240
+        },
+        "occupant": {
+          "type": "string",
+          "description": "Optional Minecraft entity to spawn inside the cage"
+        },
+        "occupant-charged": {
+          "type": "boolean",
+          "description": "Set true when occupant is minecraft:creeper"
         }
       },
-      "additionalProperties": true
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "block-cage"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "material"
+            ]
+          }
+        }
+      ]
     }
   }
 }

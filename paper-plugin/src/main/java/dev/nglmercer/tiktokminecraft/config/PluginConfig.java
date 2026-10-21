@@ -103,6 +103,10 @@ public final class PluginConfig {
     private final boolean allowConsoleCommands;
     private final boolean allowRawCommands;
 
+    // Live file hot reload
+    private final boolean hotReloadEnabled;
+    private final int hotReloadDebounceMillis;
+
     // Debug
     private final boolean logEvents;
     private final boolean logConnection;
@@ -180,6 +184,10 @@ public final class PluginConfig {
         this.allowConsoleCommands =
                 security != null && security.getBoolean("allow-console-commands", false);
         this.allowRawCommands = security != null && security.getBoolean("allow-raw-commands", false);
+
+        ConfigurationSection hotReload = config.getConfigurationSection("hot-reload");
+        this.hotReloadEnabled = hotReload == null || hotReload.getBoolean("enabled", true);
+        this.hotReloadDebounceMillis = clamp(hotReload, "debounce-ms", 750, 250, 5000);
 
         ConfigurationSection debug = config.getConfigurationSection("debug");
         this.logEvents = debug != null && debug.getBoolean("log-events", false);
@@ -395,6 +403,14 @@ public final class PluginConfig {
 
     public boolean allowRawCommands() {
         return allowRawCommands;
+    }
+
+    public boolean hotReloadEnabled() {
+        return hotReloadEnabled;
+    }
+
+    public int hotReloadDebounceMillis() {
+        return hotReloadDebounceMillis;
     }
 
     public boolean logEvents() {

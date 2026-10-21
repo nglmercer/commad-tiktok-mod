@@ -208,6 +208,10 @@ another.
 | `sound` | Plays a sound. |
 | `particle` | Spawns particles. |
 | `spawn-entity` | Spawns an entity next to the target. |
+| `block-cage` | Builds a temporary cage from a configurable solid block, optionally with a mob inside. |
+| `tnt-cage` | Backward-compatible alias for `block-cage` with TNT as default. |
+| `prime-tnt` | Spawns a bounded number of ignited TNT entities. |
+| `void-shaft` | Opens a temporary shaft beneath the player. |
 | `give-item` | Gives an item to the target. |
 | `effect` | Applies a potion effect. |
 | `heal` | Heals the target. |
@@ -227,6 +231,50 @@ actions:
     args:
       count: 1
 ```
+
+### Configurable block cages
+
+A rule can trap the selected player inside a small cage made from any
+placeable solid vanilla Minecraft **block**, for example TNT, obsidian,
+glass or iron bars. Inventory-only items such as swords are not blocks.
+
+```yaml
+actions:
+  - type: block-cage
+    material: minecraft:obsidian
+    radius: 2
+    height: 3
+    restore-seconds: 30
+    target: nearest-online
+```
+
+The Rose (gift ID `5655`) preset combines the cage and the creeper
+in **one action**, ensuring the same player is selected for both:
+
+```yaml
+actions:
+  - type: block-cage
+    material: minecraft:tnt
+    radius: 1
+    height: 3
+    occupant: minecraft:creeper
+    occupant-charged: true
+    ignite: false
+    restore-seconds: 20
+    target: nearest-online
+```
+
+To ignite TNT, set `ignite: true` and optionally specify
+`ignite-delay-ticks` and `fuse-ticks`. Ignition is rejected for any
+non-TNT material. `tnt-cage` remains a valid legacy alias for
+`block-cage` and defaults to TNT when `material` is omitted.
+
+`radius` is 1–3, `height` is 3–6, `restore-seconds` is 0–120
+(`0` means a permanent cage), and `occupant` is optional. Spawning
+occupants and ignited TNT counts toward the entity rate limits.
+Temporary cages avoid container blocks and overlapping active cages.
+Restoration is best-effort; explosions, plugin crashes and unloaded
+chunks can leave terrain modifications behind.
 
 `target` accepts `all-online`, `random-online`, `nearest-online`,
 `specific-player:<name>` and `specific-world:<name>`. When it is omitted,

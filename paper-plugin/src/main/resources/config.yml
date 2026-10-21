@@ -32,7 +32,7 @@ chat:
 events:
   enabled: true
   # When true, a rule that does not say otherwise is enabled.
-  default-enabled: false
+  default-enabled: true
   # How long an event identifier is remembered for deduplication.
   deduplication-window-seconds: 300
   # Maximum number of events waiting to be processed.
@@ -72,13 +72,19 @@ actions:
     - '*'  # Admin-authored rules only; per-event caps still apply
 
 security:
-  # Master switch for actions triggered by a live event. Keep it false until
-  # the rules and functions have been tested.
+  # All shipped meme interactions are active, including the TNT-cage and void-shaft.
+  # Only run this configuration in a disposable game world.
   execute-live-actions: true
   # Allow actions to run console commands.
   allow-console-commands: true
   # Allow raw command actions.
   allow-raw-commands: false
+
+# Changes made in an editor are validated and applied without /tiktok reload.
+# A failed reload keeps the previously loaded configuration and rules.
+hot-reload:
+  enabled: true
+  debounce-ms: 750
 
 debug:
   # Log every received event.

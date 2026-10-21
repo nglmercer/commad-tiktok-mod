@@ -307,16 +307,35 @@ before you redistribute the plugin.
 
 ## Chaos interaction preset
 
-The bundled `events/interactions.yml` maps 150 likes to a zombie, Rose to two
-primed TNT per gift, Rosa to charged creepers, Finger Heart to temporary webs,
-shares to enchanted golden apples, Capybara to visual lightning, and Fireworks
-to Wither skeletons. Confetti, Cap, Corgi, Doughnut and Money Gun rules are
-disabled until an administrator enables them. Requested entity counts are capped
-at 64 per event and 240 per minute by default; Money Gun additionally caps at
-three Withers. Functions allow administrator-authored commands, while raw
-command actions remain disabled and `/tiktok` administration requires OP.
+The bundled `events/interactions.yml` enables all 12 meme interactions:
+150 likes spawns a zombie; **Rose (5655) builds a compact TNT cage with a
+charged creeper inside**; Confetti requests a bounded primed TNT burst;
+Rosa summons charged creepers; Finger Heart places temporary webs; shares
+give enchanted golden apples; Cap summons Wardens; Corgi temporarily clears
+the inventory; Capybara spawns Evokers; Doughnut opens a temporary void
+shaft; Fireworks summons Wither skeletons; and Money Gun requests Withers
+with a per-event cap of 3.
 
-Use `/tiktok test gift 5655 5` to simulate a five-Rose streak, or
+The plugin now offers reusable `block-cage` rules. The `material` can be
+`minecraft:obsidian`, `minecraft:glass`, `minecraft:tnt`, or another
+placeable solid Minecraft block. Use `occupant` for a mob inside the cage,
+`restore-seconds` for temporary enclosures, and `ignite` for TNT only.
+Old `tnt-cage` rules still work without specifying a material.
+
+Example for a Rose-based obsidian cage (instead of the default TNT prank):
+[examples/obsidian-cage.yml](examples/obsidian-cage.yml).
+
+On existing servers, `/tiktok preset install` backs up and installs the
+latest built-in rules. Saving `events/*.yml` triggers automatic hot reload.
+See [docs/MEME_PRESET.md](docs/MEME_PRESET.md) for configuration and testing.
+
+Requested entity counts are bounded by the configured rate limits (64 per
+event and 240 per minute by default). Commands and rules are
+administrator-controlled. These effects can damage or kill players, so test
+them on a disposable Minecraft world first.
+
+Use `/tiktok test gift Rose 1` to test the new TNT cage,
+`/tiktok test gift Capybara 1` for Evokers, or
 `/tiktok test like 450` for three like-threshold activations.
-Temporary inventory escrow is memory-only: keep Corgi disabled unless you accept
-item loss after an abrupt shutdown. Temporary cobwebs may also remain after a crash.
+Temporary inventory escrow and cage restoration are best-effort and
+cannot survive arbitrary process crashes.

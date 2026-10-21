@@ -6,6 +6,10 @@ import dev.nglmercer.tiktokminecraft.actions.EntityRateLimiter;
 import dev.nglmercer.tiktokminecraft.chat.TikTokChatBridge;
 import dev.nglmercer.tiktokminecraft.commands.TikTokAdminCommand;
 import dev.nglmercer.tiktokminecraft.config.PluginConfig;
+import dev.nglmercer.tiktokminecraft.config.LiveFileWatcher;
+import dev.nglmercer.tiktokminecraft.functions.FunctionRegistry;
+import org.bukkit.configuration.InvalidConfigurationException;
+import org.bukkit.configuration.file.YamlConfiguration;
 import dev.nglmercer.tiktokminecraft.event.EventBus;
 import dev.nglmercer.tiktokminecraft.event.TikTokEventContext;
 import dev.nglmercer.tiktokminecraft.functions.CommandDispatcher;
@@ -49,6 +53,8 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
     private TikTokLiveService liveService;
     private TikTokAdminCommand adminCommand;
     private BukkitTask tickTask;
+    private LiveFileWatcher fileWatcher;
+    private String lastHotReload = "Waiting for edits";
 
     private ActionRegistry actionRegistry;
     private CommandDispatcher commandDispatcher;
@@ -131,6 +137,31 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
         // One repeating task drains every pipeline on the server thread.
         tickTask = getServer().getScheduler().runTaskTimer(this, this::tick, 1L, 1L);
 
+        fileWatcher = new LiveFileWatcher(getDataFolder().toPath(),
+                config.hotReloadEnabled(), config.hotReloadDebounceMillis(),
+                changed -> {
+                    if (!isEnabled()) return;
+                    try {
+                        getServer().getScheduler().runTask(this, () -> {
+                            if (!isEnabled()) return;
+                            List<String> errors = reload();
+                            if (errors.isEmpty()) {
+                                lastHotReload = "Applied " + String.join(", ", changed);
+                                getLogger().info("Hot reload applied: " + String.join(", ", changed));
+                            } else {
+                                lastHotReload = "Rejected " + String.join(", ", changed)
+                                        + ": " + String.join("; ", errors);
+                                getLogger().warning("Hot reload rejected; previous state retained: "
+                                        + lastHotReload);
+                            }
+                        });
+                    } catch (IllegalStateException ignored) {
+                        // The server is stopping; never restart a closed watcher.
+                    }
+                },
+                message -> getLogger().warning(message));
+        fileWatcher.start();
+
         getLogger().info("Enabled. Creator: @" + config.uniqueId());
         if (config.autoConnect()) {
             liveService.connect();
@@ -141,11 +172,19 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (fileWatcher != null) {
+            fileWatcher.close();
+            fileWatcher = null;
+        }
         if (actionRegistry != null) {
             ((dev.nglmercer.tiktokminecraft.actions.ClearInventoryAction)
                     actionRegistry.get("temporary-clear-inventory")).restoreAll();
             ((dev.nglmercer.tiktokminecraft.actions.PlaceCobwebAction)
                     actionRegistry.get("place-cobweb")).restoreAll();
+            ((dev.nglmercer.tiktokminecraft.actions.TntCageAction)
+                    actionRegistry.get("tnt-cage")).restoreAll();
+            ((dev.nglmercer.tiktokminecraft.actions.VoidShaftAction)
+                    actionRegistry.get("void-shaft")).restoreAll();
         }
         if (tickTask != null) {
             tickTask.cancel();
@@ -245,9 +284,18 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
      * @return the problems that prevented the reload, or an empty list
      */
     public List<String> reload() {
-        List<String> problems = new ArrayList<String>();
-        reloadConfig();
-        PluginConfig.Result result = PluginConfig.load(getConfig());
+        List<String> problems = new ArrayList<>();
+        // Bukkit's loadConfiguration() silently falls back to an empty config
+        // on malformed YAML. Parse strictly so an editor's partial save cannot
+        // replace a working configuration with defaults.
+        YamlConfiguration candidate = new YamlConfiguration();
+        try {
+            candidate.load(getDataFolder().toPath().resolve("config.yml").toFile());
+        } catch (IOException | InvalidConfigurationException failure) {
+            problems.add("config.yml: " + failure.getMessage());
+            return problems;
+        }
+        PluginConfig.Result result = PluginConfig.load(candidate);
         if (!result.isValid()) {
             problems.addAll(result.problems());
             return problems;
@@ -255,32 +303,58 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
         PluginConfig previous = config;
         PluginConfig updated = result.config();
 
-        problems.addAll(loadFunctions());
-        problems.addAll(loadRules(updated));
-
+        // Stage a complete backup before touching the shared function registry.
+        // The YAML rules validate referenced functions against that registry,
+        // so functions are applied first and reverted if *any* rule fails.
+        FunctionRegistry previousFunctions = new FunctionRegistry();
+        previousFunctions.replaceAll(functionEngine.registry());
+        RulesSnapshot previousRules = ruleEngine.snapshot();
+        try {
+            functionEngine.applyConfig(updated.functionLimits(),
+                    new CommandPolicy(updated.allowedCommands()));
+            problems.addAll(loadFunctions());
+            if (problems.isEmpty()) problems.addAll(loadRules(updated));
+        } catch (RuntimeException failure) {
+            problems.add("Reload failed: " + failure.getMessage());
+        }
         if (!problems.isEmpty()) {
-            // The previous configuration stays active, so the engine goes
-            // back to the limits and the allowlist it had before.
+            functionEngine.registry().replaceAll(previousFunctions);
+            ruleEngine.apply(previousRules);
             if (previous != null) {
-                functionEngine.applyConfig(
-                        previous.functionLimits(),
+                functionEngine.applyConfig(previous.functionLimits(),
                         new CommandPolicy(previous.allowedCommands()));
             }
             return problems;
         }
+
+        // Apply the typed snapshot only after all input files are valid.
+        // Calls to reloadConfig() are only made after validation succeeds.
+        reloadConfig();
+        if (previous == null || previous.maxEntitiesPerMinute() != updated.maxEntitiesPerMinute()) {
+            entityLimiter = new EntityRateLimiter(updated.maxEntitiesPerMinute());
+        }
         config = updated;
-        eventBus.applyConfig(updated);
+        // Do not reset event deduplication merely because an administrator
+        // edited an action, function or DSL rule while connected to LIVE.
+        if (previous == null || previous.maxPendingEvents() != updated.maxPendingEvents()
+                || previous.deduplicationWindowSeconds() != updated.deduplicationWindowSeconds()
+                || previous.eventsIgnoreHistory() != updated.eventsIgnoreHistory()) {
+            eventBus.applyConfig(updated);
+        }
         chatBridge.applyConfig(updated);
         liveService.applyConfig(updated);
+        if (fileWatcher != null) {
+            fileWatcher.configure(updated.hotReloadEnabled(), updated.hotReloadDebounceMillis());
+        }
 
         boolean connectionChanged = previous == null
                 || !previous.uniqueId().equals(updated.uniqueId())
                 || previous.fetchGifts() != updated.fetchGifts();
         if (connectionChanged) {
-            getLogger().info("Connection settings changed; reconnecting.");
+            getLogger().info("TikTok connection settings changed; reconnecting.");
             liveService.reconnect();
         }
-        getLogger().info("Configuration reloaded.");
+        getLogger().info("Configuration, functions and rules reloaded.");
         return problems;
     }
 
@@ -424,6 +498,14 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
 
     public PluginConfig config() {
         return config;
+    }
+
+    public boolean hotReloadEnabled() {
+        return fileWatcher != null && fileWatcher.enabled();
+    }
+
+    public String hotReloadStatus() {
+        return lastHotReload;
     }
 
     public PluginLog log() {

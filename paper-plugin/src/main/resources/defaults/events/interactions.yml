@@ -17,21 +17,26 @@ rules:
         count: 1
         target: nearest-online
 
-  - id: meme-rose-tnt
+  # One Rose creates a compact 3x3 TNT cage with a charged creeper
+  # trapped inside alongside the player. No need to use console /fill.
+  - id: meme-rose-charged-creeper-cage
     enabled: true
     trigger: gift.final
     match:
       gift-id: '5655'
     actions:
-      - type: prime-tnt
-        count: 2
-        multiply-by-repeat: true
-        fuse-ticks: 80
-        burst-size: 4
+      - type: block-cage
+        material: minecraft:tnt
+        radius: 1
+        height: 3
+        occupant: minecraft:creeper
+        occupant-charged: true
+        ignite: false
+        restore-seconds: 20
         target: nearest-online
 
   - id: meme-confetti-tnt
-    enabled: false # Extremely destructive: opt in explicitly
+    enabled: true # Limited to bounded TNT bursts at runtime
     trigger: gift.final
     match:
       gift-id: '5585'
@@ -53,6 +58,28 @@ rules:
         charged: true
         count: 1
         multiply-by-repeat: true
+        target: nearest-online
+
+  # Separate prank: any donation worth at least 100 diamonds creates
+  # a TNT cage. The priming step is optional and acts like an ignited /fill.
+  - id: meme-high-value-tnt-cage
+    enabled: true
+    trigger: gift.final
+    match:
+      diamonds:
+        greater-or-equal: 100
+    cooldown:
+      duration: 15s
+      scope: rule
+    actions:
+      - type: block-cage
+        material: minecraft:tnt
+        radius: 2
+        height: 3
+        ignite: true
+        ignite-delay-ticks: 40
+        fuse-ticks: 80
+        restore-seconds: 25
         target: nearest-online
 
   - id: meme-finger-heart-webs
@@ -77,7 +104,7 @@ rules:
         target: nearest-online
 
   - id: meme-cap-wardens
-    enabled: false # Disable by default: ten wardens can destroy survival gameplay
+    enabled: true # Ten wardens are intentionally part of the meme
     trigger: gift.final
     match:
       gift-id: '6104'
@@ -90,7 +117,7 @@ rules:
         target: nearest-online
 
   - id: meme-corgi-inventory
-    enabled: false # Temporary inventory removal: test on a disposable world first
+    enabled: true # Inventory is restored automatically
     trigger: gift.final
     match:
       gift-id: '6267'
@@ -99,27 +126,33 @@ rules:
         restore-seconds: 8
         target: nearest-online
 
-  - id: meme-capybara-lightning
+  - id: meme-capybara-evokers
     enabled: true
     trigger: gift.final
     match:
       gift-id: '14488'
     actions:
-      - type: lightning-effect
+      - type: spawn-entity
+        entity: minecraft:evoker
         multiply-by-repeat: true
         count: 15
+        max-effective-count: 15
         target: nearest-online
 
-  - id: meme-doughnut-minus-one
-    enabled: false # The depicted Minecraft inventory icon is ambiguous: assumed Totem
+  - id: meme-doughnut-void
+    enabled: true # Digs the blocks below the player to the world's minimum height
     trigger: gift.final
     match:
       gift-id: '5879'
+    cooldown:
+      duration: 30s
+      scope: rule
     actions:
-      - type: remove-item
-        material: minecraft:totem_of_undying
-        multiply-by-repeat: true
-        count: 1
+      - type: void-shaft
+        radius: 1
+        max-blocks: 4096
+        blocks-per-tick: 96
+        restore-seconds: 30
         target: nearest-online
 
   - id: meme-fireworks-skeletons
@@ -136,7 +169,7 @@ rules:
         target: nearest-online
 
   - id: meme-money-gun-withers
-    enabled: false # Request 500, cap actual spawned to 3 per activation
+    enabled: true # Request 500, cap actual spawned to 3 per activation
     trigger: gift.final
     match:
       gift-id: '7168' # Money Gun, not Gem Gun

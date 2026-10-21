@@ -1,0 +1,172 @@
+package dev.nglmercer.tiktokminecraft.config;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Set;
+import java.util.LinkedHashSet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+
+/**
+ * Portable hot reload watcher. Scans an intentionally small subset of the plugin
+ * directory on a daemon thread. Content fingerprints (rather than WatchService)
+ * support atomic editor saves and filesystems that coalesce/miss rename events.
+ * Bukkit interaction is delegated to the caller and MUST run on the main thread.
+ */
+public final class LiveFileWatcher implements AutoCloseable {
+    private static final int MAX_FILES = 512;
+    private static final long MAX_TOTAL_BYTES = 16L * 1024 * 1024;
+    private static final int MAX_DEPTH = 8;
+    private static final long MAX_FILE_SIZE = 2L * 1024 * 1024;
+    private final Path root;
+    private final Consumer<List<String>> onSettledChange;
+    private final Consumer<String> error;
+    private final ScheduledExecutorService worker;
+
+    private volatile long debounceMillis;
+    private volatile boolean enabled;
+    private volatile boolean closed;
+    private Map<String, String> baseline;
+    private Map<String, String> pending;
+    private long changedAtNanos;
+    private boolean initialized;
+    private String lastError;
+
+    public LiveFileWatcher(Path root, boolean enabled, long debounceMillis,
+            Consumer<List<String>> onSettledChange, Consumer<String> error) {
+        this.root = root.toAbsolutePath().normalize();
+        this.enabled = enabled;
+        this.debounceMillis = Math.max(250L, Math.min(5000L, debounceMillis));
+        this.onSettledChange = onSettledChange;
+        this.error = error;
+        this.worker = Executors.newSingleThreadScheduledExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "tiktokminecraft-hot-reload");
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
+
+    /** Starts polling every 500 ms; content changes settle for the configured debounce. */
+    public void start() {
+        worker.scheduleWithFixedDelay(this::pollSafely, 0L, 500L, TimeUnit.MILLISECONDS);
+    }
+
+    public void configure(boolean enabled, long debounceMillis) {
+        this.enabled = enabled;
+        this.debounceMillis = Math.max(250L, Math.min(5000L, debounceMillis));
+    }
+
+    public boolean enabled() { return enabled; }
+
+    private void pollSafely() {
+        if (closed) return;
+        try {
+            Map<String, String> state = fingerprint();
+            lastError = null;
+            if (!initialized) {
+                baseline = state;
+                initialized = true;
+                return;
+            }
+            if (!state.equals(baseline)) {
+                if (!state.equals(pending)) {
+                    pending = state;
+                    changedAtNanos = System.nanoTime();
+                } else if ((System.nanoTime() - changedAtNanos) / 1_000_000L >= debounceMillis) {
+                    Map<String, String> previous = baseline;
+                    baseline = state;
+                    pending = null;
+                    if (enabled) {
+                        List<String> changed = new ArrayList<>();
+                        Set<String> keys = new LinkedHashSet<>(previous.keySet());
+                        keys.addAll(state.keySet());
+                        for (String key : keys) {
+                            if (!java.util.Objects.equals(previous.get(key), state.get(key)))
+                                changed.add(key);
+                        }
+                        onSettledChange.accept(changed);
+                    }
+                }
+            } else {
+                pending = null;
+            }
+        } catch (Exception failure) {
+            String message = "File watcher scan failed: " + failure.getMessage();
+            if (!message.equals(lastError)) {
+                lastError = message;
+                error.accept(message);
+            }
+        }
+    }
+
+    /**
+     * A sorted SHA-256 of paths and contents. Temporary editor files, backups,
+     * symlinks, and generated cache/exports are deliberately ignored.
+     */
+    private Map<String, String> fingerprint() throws IOException {
+        Map<String, String> checksums = new LinkedHashMap<>();
+        List<Path> paths = new ArrayList<>();
+        Path config = root.resolve("config.yml");
+        if (Files.isRegularFile(config) && !Files.isSymbolicLink(config)) paths.add(config);
+        for (String folder : List.of("events", "functions", "scripts")) {
+            Path directory = root.resolve(folder);
+            if (!Files.isDirectory(directory) || Files.isSymbolicLink(directory)) continue;
+            try (var files = Files.walk(directory, MAX_DEPTH)) {
+                files.filter(Files::isRegularFile)
+                     .filter(path -> !Files.isSymbolicLink(path))
+                     .filter(this::supported)
+                     .forEach(paths::add);
+            }
+        }
+        if (paths.size() > MAX_FILES) throw new IOException("Too many watched files");
+        paths.sort(Comparator.comparing(path -> root.relativize(path).toString()));
+        long totalBytes = 0;
+        for (Path path : paths) {
+            long size = Files.size(path);
+            totalBytes += size;
+            if (totalBytes > MAX_TOTAL_BYTES)
+                throw new IOException("Watched file size budget exceeded (16 MiB)");
+            if (size > MAX_FILE_SIZE) throw new IOException("File too large: " + path.getFileName());
+            byte[] bytes = Files.readAllBytes(path);
+            MessageDigest digest = digest();
+            digest.update(bytes);
+            checksums.put(root.relativize(path).toString().replace('\\', '/'),
+                    java.util.HexFormat.of().formatHex(digest.digest()));
+        }
+        return checksums;
+    }
+
+    private boolean supported(Path path) {
+        String name = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
+        if (name.startsWith(".") || name.endsWith("~") || name.contains(".bak")
+                || name.endsWith(".tmp") || name.endsWith(".swp")) return false;
+        Path relative = root.relativize(path);
+        String folder = relative.getName(0).toString();
+        if ("events".equals(folder)) return name.endsWith(".yml");
+        if ("functions".equals(folder)) return name.endsWith(".json") || name.endsWith(".mcfunction");
+        return "scripts".equals(folder) && name.endsWith(".ttl");
+    }
+
+    private static MessageDigest digest() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
+    @Override public void close() {
+        closed = true;
+        worker.shutdownNow();
+    }
+}

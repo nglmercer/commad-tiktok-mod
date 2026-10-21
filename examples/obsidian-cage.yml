@@ -1,0 +1,17 @@
+# Optional example: one Rose encloses the selected player in obsidian.
+# This file is NOT installed automatically; copy the rule into your events/
+# folder if you want to replace or complement the default Rose TNT prank.
+rules:
+  - id: demo-obsidian-cage
+    enabled: true
+    trigger: gift.final
+    match:
+      gift-id: '5655'
+    actions:
+      - type: block-cage
+        material: minecraft:obsidian
+        radius: 2
+        height: 3
+        ignite: false
+        restore-seconds: 30
+        target: nearest-online
