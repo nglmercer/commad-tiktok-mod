@@ -17,17 +17,22 @@ rules:
         count: 1
         target: nearest-online
 
-  - id: meme-rose-tnt
+  # One Rose creates a compact 3x3 TNT cage with a charged creeper
+  # trapped inside alongside the player. No need to use console /fill.
+  - id: meme-rose-charged-creeper-cage
     enabled: true
     trigger: gift.final
     match:
       gift-id: '5655'
     actions:
-      - type: prime-tnt
-        count: 2
-        multiply-by-repeat: true
-        fuse-ticks: 80
-        burst-size: 4
+      - type: block-cage
+        material: minecraft:tnt
+        radius: 1
+        height: 3
+        occupant: minecraft:creeper
+        occupant-charged: true
+        ignite: false
+        restore-seconds: 20
         target: nearest-online
 
   - id: meme-confetti-tnt
@@ -67,7 +72,8 @@ rules:
       duration: 15s
       scope: rule
     actions:
-      - type: tnt-cage
+      - type: block-cage
+        material: minecraft:tnt
         radius: 2
         height: 3
         ignite: true
