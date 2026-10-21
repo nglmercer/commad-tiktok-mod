@@ -6,6 +6,13 @@
 tiktok:
   # The TikTok username of the creator to watch. The leading @ is optional.
   unique-id: "@elpadredomingooficial"
+  # Default player for this creator (Minecraft name or UUID); empty uses rule targets.
+  target-player: ""
+  # Additional collaborators, each with an independent LIVE connection.
+  # accounts:
+  #   - unique-id: "@collaborator"
+  #     target-player: "MinecraftPlayer"
+  accounts: []
   # Connect as soon as the plugin starts.
   auto-connect: true
   # Retry automatically after a connection failure.

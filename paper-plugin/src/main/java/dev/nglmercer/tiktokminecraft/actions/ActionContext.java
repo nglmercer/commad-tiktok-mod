@@ -111,13 +111,24 @@ public final class ActionContext {
 
     /** The players an action applies to. */
     public List<Player> targets(String spec) {
-        return TargetResolver.resolve(spec, config.targetPolicy(), origin());
+        return TargetResolver.resolve(targetSpec(spec), config.targetPolicy(), origin());
+    }
+
+    String targetSpec(String spec) {
+        String target = connectionTarget();
+        return target != null && (spec == null || spec.isBlank()
+                || spec.trim().equalsIgnoreCase("nearest-online")) ? target : spec;
+    }
+
+    private String connectionTarget() {
+        Object target = event == null ? null : event.payload().get("connection.targetPlayer");
+        return target == null || target.toString().isBlank() ? null : "specific-player:" + target;
     }
 
     /** The location relative actions are resolved against. */
     public Location origin() {
         List<Player> players = TargetResolver.resolve(
-                null, config.targetPolicy(), null);
+                connectionTarget(), config.targetPolicy(), null);
         if (players.isEmpty()) {
             return null;
         }

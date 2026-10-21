@@ -46,11 +46,13 @@ import org.bukkit.scheduler.BukkitTask;
  */
 public final class TikTokMinecraftPlugin extends JavaPlugin {
 
-    private PluginConfig config;
+    private volatile PluginConfig config;
     private PluginLog log;
     private EventBus eventBus;
     private TikTokChatBridge chatBridge;
     private TikTokLiveService liveService;
+    private final Map<String, TikTokLiveService> connections = new java.util.LinkedHashMap<>();
+    public Map<String, TikTokLiveService> connections() { return java.util.Collections.unmodifiableMap(connections); }
     private TikTokAdminCommand adminCommand;
     private BukkitTask tickTask;
     private LiveFileWatcher fileWatcher;
@@ -110,22 +112,7 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
         eventBus = new EventBus(config);
         chatBridge = new TikTokChatBridge(log, config);
 
-        liveService =
-                new TikTokLiveService(
-                        log,
-                        getDataFolder().toPath().resolve("cache"),
-                        new TikTokLiveService.Listener() {
-                            @Override
-                            public void onEvent(TikTokEventContext event) {
-                                eventBus.offer(event);
-                            }
-
-                            @Override
-                            public void onState(LiveConnectionState state, String detail) {
-                                log.debug(LogCategory.CONNECTION, state + ": " + detail);
-                            }
-                        },
-                        config);
+        reconcileConnections(null, config);
 
         adminCommand = new TikTokAdminCommand(this);
         PluginCommand command = getCommand("tiktok");
@@ -164,7 +151,7 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
 
         getLogger().info("Enabled. Creator: @" + config.uniqueId());
         if (config.autoConnect()) {
-            liveService.connect();
+            connections.values().forEach(TikTokLiveService::connect);
         } else {
             getLogger().info("Auto-connect is disabled; use /tiktok connect.");
         }
@@ -190,10 +177,9 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
             tickTask.cancel();
             tickTask = null;
         }
-        if (liveService != null) {
-            liveService.close();
-            liveService = null;
-        }
+        connections.values().forEach(TikTokLiveService::close);
+        connections.clear();
+        liveService = null;
         if (functionEngine != null) {
             functionEngine.close();
             functionEngine = null;
@@ -231,6 +217,9 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
     }
 
     private void handleEvent(TikTokEventContext event) {
+        Object source = event.payload().get("connection.uniqueId");
+        if (source != null && config.accounts().stream()
+                .noneMatch(a -> a.uniqueId().equalsIgnoreCase(source.toString()))) return;
         if (chatBridge != null) {
             chatBridge.accept(event);
         }
@@ -342,18 +331,11 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
             eventBus.applyConfig(updated);
         }
         chatBridge.applyConfig(updated);
-        liveService.applyConfig(updated);
+        reconcileConnections(previous, updated);
         if (fileWatcher != null) {
             fileWatcher.configure(updated.hotReloadEnabled(), updated.hotReloadDebounceMillis());
         }
 
-        boolean connectionChanged = previous == null
-                || !previous.uniqueId().equals(updated.uniqueId())
-                || previous.fetchGifts() != updated.fetchGifts();
-        if (connectionChanged) {
-            getLogger().info("TikTok connection settings changed; reconnecting.");
-            liveService.reconnect();
-        }
         getLogger().info("Configuration, functions and rules reloaded.");
         return problems;
     }
@@ -374,15 +356,97 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
         if (liveService == null) {
             return "The plugin is not running";
         }
+        String oldCreator = getConfig().getString("tiktok.unique-id");
         getConfig().set("tiktok.unique-id", uniqueId);
         PluginConfig.Result result = PluginConfig.load(getConfig());
         if (!result.isValid()) {
-            saveConfig();
+            getConfig().set("tiktok.unique-id", oldCreator);
             return result.problems().get(0);
         }
+        PluginConfig previous = config;
         config = result.config();
-        liveService.applyConfig(config);
-        liveService.reconnect();
+        reconcileConnections(previous, config);
+        liveService.connect();
+        saveConfig();
+        return null;
+    }
+
+    private void reconcileConnections(PluginConfig previous, PluginConfig updated) {
+        java.util.Set<String> wanted = new java.util.HashSet<>();
+        for (PluginConfig.Account account : updated.accounts()) {
+            String key = account.uniqueId().toLowerCase(java.util.Locale.ROOT);
+            wanted.add(key);
+            TikTokLiveService service = connections.get(key);
+            if (service == null) {
+                service = new TikTokLiveService(log, getDataFolder().toPath().resolve("cache").resolve(key),
+                        new TikTokLiveService.Listener() {
+                            public void onEvent(TikTokEventContext event) {
+                                // Read the current account target without restarting its LIVE session.
+                                PluginConfig snapshot = config;
+                                PluginConfig.Account current = snapshot.accounts().stream()
+                                        .filter(a -> a.uniqueId().equalsIgnoreCase(key)).findFirst().orElse(null);
+                                if (current == null) return;
+                                Map<String, Object> payload = new java.util.LinkedHashMap<>(event.payload());
+                                payload.put("connection.uniqueId", current.uniqueId());
+                                payload.put("connection.targetPlayer", current.targetPlayer());
+                                eventBus.offer(new TikTokEventContext(event.eventId(), event.roomId(), event.type(),
+                                        event.userId(), event.uniqueId(), event.nickname(), event.timestamp(),
+                                        event.history(), payload));
+                            }
+                            public void onState(LiveConnectionState state, String detail) {
+                                log.debug(LogCategory.CONNECTION, "@" + key + " " + state + ": " + detail);
+                            }
+                        }, updated, account.uniqueId());
+                connections.put(key, service);
+                if (previous != null && updated.autoConnect()) service.connect();
+            } else {
+                service.applyConfig(updated);
+                if (previous != null && previous.fetchGifts() != updated.fetchGifts()) service.reconnect();
+            }
+        }
+        connections.entrySet().removeIf(entry -> {
+            if (wanted.contains(entry.getKey())) return false;
+            entry.getValue().close();
+            return true;
+        });
+        liveService = connections.get(updated.uniqueId().toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /** Persists an account edit only after the complete configuration validates. */
+    public String editAccount(String action, String username, String target) {
+        String name = PluginConfig.normalizeUniqueId(username);
+        if (!name.matches("[A-Za-z0-9._]{1,24}")) return "Invalid TikTok username";
+        boolean primary = name.equalsIgnoreCase(config.uniqueId());
+        List<Map<String, Object>> entries = new ArrayList<>();
+        for (PluginConfig.Account account : config.accounts()) {
+            if (!account.uniqueId().equalsIgnoreCase(config.uniqueId())) {
+                Map<String, Object> entry = new java.util.LinkedHashMap<>();
+                entry.put("unique-id", account.uniqueId());
+                entry.put("target-player", account.targetPlayer());
+                entries.add(entry);
+            }
+        }
+        boolean exists = config.accounts().stream().anyMatch(a -> a.uniqueId().equalsIgnoreCase(name));
+        if (action.equals("add") && exists) return "Account already exists";
+        if (!action.equals("add") && !exists) return "Unknown account";
+        if (action.equals("remove") && primary) return "The primary creator cannot be removed; use /tiktok creator to change it";
+        Object oldEntries = getConfig().get("tiktok.accounts");
+        Object oldTarget = getConfig().get("tiktok.target-player");
+        if (action.equals("remove")) entries.removeIf(e -> name.equalsIgnoreCase(String.valueOf(e.get("unique-id"))));
+        else if (primary) getConfig().set("tiktok.target-player", target);
+        else if (action.equals("add")) entries.add(new java.util.LinkedHashMap<>(Map.of("unique-id", name, "target-player", target)));
+        else entries.stream().filter(e -> name.equalsIgnoreCase(String.valueOf(e.get("unique-id"))))
+                .forEach(e -> e.put("target-player", target));
+        getConfig().set("tiktok.accounts", entries);
+        PluginConfig.Result result = PluginConfig.load(getConfig());
+        if (!result.isValid()) {
+            getConfig().set("tiktok.accounts", oldEntries);
+            getConfig().set("tiktok.target-player", oldTarget);
+            return String.join("; ", result.problems());
+        }
+        PluginConfig previous = config;
+        config = result.config();
+        reconcileConnections(previous, config);
         saveConfig();
         return null;
     }

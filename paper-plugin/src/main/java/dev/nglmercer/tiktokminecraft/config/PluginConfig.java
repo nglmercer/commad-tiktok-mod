@@ -64,6 +64,10 @@ public final class PluginConfig {
     private final boolean fetchGifts;
     private final boolean tiktokIgnoreHistory;
 
+    public record Account(String uniqueId, String targetPlayer) {}
+    private final List<Account> accounts;
+    public List<Account> accounts() { return accounts; }
+
     // Chat
     private final boolean chatEnabled;
     private final boolean chatConsole;
@@ -136,6 +140,16 @@ public final class PluginConfig {
         this.reconnect = tiktok == null || tiktok.getBoolean("reconnect", true);
         this.fetchGifts = tiktok == null || tiktok.getBoolean("fetch-gifts", true);
         this.tiktokIgnoreHistory = tiktok == null || tiktok.getBoolean("ignore-history", true);
+
+        List<Account> connections = new ArrayList<>();
+        connections.add(new Account(uniqueId, config.getString("tiktok.target-player", "").trim()));
+        for (java.util.Map<?, ?> entry : config.getMapList("tiktok.accounts")) {
+            Object username = entry.get("unique-id");
+            Object target = entry.get("target-player");
+            connections.add(new Account(normalizeUniqueId(username == null ? "" : String.valueOf(username)),
+                    target == null ? "" : String.valueOf(target).trim()));
+        }
+        this.accounts = List.copyOf(connections);
 
         ConfigurationSection chat = config.getConfigurationSection("chat");
         this.chatEnabled = chat == null || chat.getBoolean("enabled", true);
@@ -211,6 +225,24 @@ public final class PluginConfig {
             problems.add("tiktok.unique-id must not be empty");
         } else if (!parsed.uniqueId.matches("[A-Za-z0-9._]{1,24}")) {
             problems.add("tiktok.unique-id must be a TikTok username, got: " + parsed.uniqueId);
+        }
+        if (config.contains("tiktok.accounts") && !config.isList("tiktok.accounts")) {
+            problems.add("tiktok.accounts must be a list");
+        }
+        if (config.isList("tiktok.accounts")
+                && config.getList("tiktok.accounts").size() != config.getMapList("tiktok.accounts").size()) {
+            problems.add("Each tiktok.accounts entry must contain unique-id and optional target-player");
+        }
+        java.util.Set<String> names = new java.util.HashSet<>();
+        for (Account account : parsed.accounts) {
+            if (!account.uniqueId().matches("[A-Za-z0-9._]{1,24}"))
+                problems.add("Invalid TikTok account username: " + account.uniqueId());
+            if (!names.add(account.uniqueId().toLowerCase(Locale.ROOT)))
+                problems.add("Duplicate TikTok account: " + account.uniqueId());
+            if (!account.targetPlayer().isEmpty()
+                    && !account.targetPlayer().matches("[A-Za-z0-9_]{1,16}")
+                    && !account.targetPlayer().matches("[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}"))
+                problems.add("target-player must be a Minecraft player name or UUID: " + account.targetPlayer());
         }
         if (parsed.chatPrefix != null && parsed.chatPrefix.length() > 32) {
             problems.add("chat.prefix must be at most 32 characters");

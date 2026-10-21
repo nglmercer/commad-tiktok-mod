@@ -53,6 +53,7 @@ public final class TikTokLiveService implements AutoCloseable {
     private final AtomicBoolean connecting = new AtomicBoolean(false);
     private final AtomicInteger reconnectAttempts = new AtomicInteger();
 
+    private final String creator;
     private volatile PluginConfig config;
     private volatile TikTokLive live;
     private volatile EmbeddedJavaConnectionProvider provider;
@@ -64,6 +65,12 @@ public final class TikTokLiveService implements AutoCloseable {
 
     public TikTokLiveService(
             PluginLog log, Path cacheDirectory, Listener listener, PluginConfig config) {
+        this(log, cacheDirectory, listener, config, config.uniqueId());
+    }
+
+    public TikTokLiveService(PluginLog log, Path cacheDirectory, Listener listener,
+            PluginConfig config, String creator) {
+        this.creator = creator;
         this.log = log;
         this.cacheDirectory = cacheDirectory;
         this.listener = listener;
@@ -124,16 +131,17 @@ public final class TikTokLiveService implements AutoCloseable {
                     EmbeddedJavaConnectionProvider.builder()
                             .cacheDirectory(cacheDirectory)
                             .build();
-            TikTokLive newLive = TikTokLive.builder(config.uniqueId())
+            TikTokLive newLive = TikTokLive.builder(creator)
                     .connectionProvider(newProvider)
                     .fetchGifts(config.fetchGifts())
                     .build();
             register(newLive);
             provider = newProvider;
             live = newLive;
-            setState(LiveConnectionState.CONNECTING, "Connecting to @" + config.uniqueId());
-            log.info(LogCategory.CONNECTION, "Connecting to @" + config.uniqueId());
+            setState(LiveConnectionState.CONNECTING, "Connecting to @" + creator);
+            log.info(LogCategory.CONNECTION, "Connecting to @" + creator);
             newLive.connect().whenComplete((result, failure) -> {
+                if (stopped || live != newLive) return;
                 connecting.set(false);
                 if (failure != null) {
                     handleFailure(failure);
@@ -159,6 +167,7 @@ public final class TikTokLiveService implements AutoCloseable {
     /** Stops the connection and releases the provider. */
     public void disconnect() {
         manualDisconnect = true;
+        cancelPendingRetry();
         connecting.set(false);
         TikTokLive current = live;
         live = null;
@@ -208,28 +217,34 @@ public final class TikTokLiveService implements AutoCloseable {
         target.onUnknown(event -> dispatch(event, target));
 
         target.onConnected(state -> {
+            if (stopped || live != target) return;
             roomId = state.roomId();
             setState(LiveConnectionState.CONNECTED, "Connected to room " + state.roomId());
             log.info(LogCategory.CONNECTION, "Connected to room " + state.roomId());
         });
         target.onDisconnected(state -> {
+            if (stopped || live != target) return;
             roomId = state.roomId();
             setState(LiveConnectionState.IDLE, "Disconnected");
             log.info(LogCategory.CONNECTION, "Disconnected");
         });
         target.onReconnecting(reconnecting -> {
+            if (stopped || live != target) return;
             setState(LiveConnectionState.RECONNECTING,
                     "Reconnecting (attempt " + reconnecting.attempt() + ")");
             log.warn(LogCategory.CONNECTION, "Reconnecting, attempt " + reconnecting.attempt()
                     + " in " + reconnecting.delay().toMillis() + "ms");
         });
         target.onOffline(state -> {
+            if (stopped || live != target) return;
             roomId = state.roomId();
             setState(LiveConnectionState.OFFLINE, "Creator is not live right now");
             log.warn(LogCategory.CONNECTION,
-                    "@" + config.uniqueId() + " is not live right now");
+                    "@" + creator + " is not live right now");
         });
-        target.onError(this::handleFailure);
+        target.onError(failure -> {
+            if (!stopped && live == target) handleFailure(failure);
+        });
     }
 
     private void dispatch(io.github.nglmercer.tiktoklive.LiveEvent event, TikTokLive target) {

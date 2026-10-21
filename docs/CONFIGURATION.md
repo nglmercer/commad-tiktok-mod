@@ -217,3 +217,37 @@ Reload failed; the previous configuration is still active:
 
 The TikTok connection is only restarted when a connection relevant setting
 actually changed. A rule or function change never disturbs a live session.
+
+### Collaborating with multiple streamers
+
+The existing `tiktok.unique-id` remains the primary creator. Add collaborators
+without restarting the server:
+
+```text
+/tiktok account add @friend FriendMinecraftName
+/tiktok account target @your_creator YourMinecraftName
+/tiktok account list
+/tiktok connect all
+/tiktok disconnect friend
+/tiktok reconnect friend
+/tiktok account target friend NewPlayerName
+/tiktok account target friend clear
+/tiktok account remove friend
+```
+
+Account edits are saved to `config.yml`. Additional accounts live in
+`tiktok.accounts`, a list of maps with `unique-id` and optional `target-player`.
+The primary creator uses `tiktok.target-player`. Names and player UUIDs are
+accepted. With auto-connect enabled, new accounts connect immediately; otherwise
+use `/tiktok connect <username>`. Connection commands without an account still
+operate on the primary creator. The primary creator can be changed with
+`/tiktok creator <username>`; it cannot be removed.
+
+The account player is the default target for actions and functions triggered by
+that account. The account assignment also replaces `nearest-online` targets used by the
+shipped interactions. Other explicit action targets (for example `all-online` or
+`specific-player:Name`) take precedence. If the assigned player is offline,
+player actions have no target rather than selecting another streamer. Clearing
+an assignment restores the shared target policy. Target edits do not reconnect
+the account. Connection options and event/action limits are shared across all
+accounts. Chat continues to mirror through the shared chat bridge.

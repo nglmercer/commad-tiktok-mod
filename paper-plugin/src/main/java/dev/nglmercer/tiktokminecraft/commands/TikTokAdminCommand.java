@@ -42,7 +42,7 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBCOMMANDS = Collections.unmodifiableList(
             Arrays.asList(
                     "help", "status", "connect", "disconnect", "reconnect", "reload",
-                    "chat", "creator", "rules", "functions", "jobs", "test", "debug", "preset"));
+                    "chat", "creator", "account", "rules", "functions", "jobs", "test", "debug", "preset"));
 
     private final TikTokMinecraftPlugin plugin;
     private final Instant startedAt = Instant.now();
@@ -92,13 +92,13 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
         }
         switch (sub) {
             case "connect":
-                connect(sender);
+                connection(sender, args, "connect");
                 return true;
             case "disconnect":
-                disconnect(sender);
+                connection(sender, args, "disconnect");
                 return true;
             case "reconnect":
-                reconnect(sender);
+                connection(sender, args, "reconnect");
                 return true;
             case "reload":
                 reload(sender);
@@ -108,6 +108,9 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
                 return true;
             case "chat":
                 chat(sender, args);
+                return true;
+            case "account":
+                account(sender, args);
                 return true;
             case "creator":
                 creator(sender, args);
@@ -143,6 +146,8 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("  /" + label + " reload - reload the configuration, rules and functions");
         sender.sendMessage("  /" + label + " preset install - back up and enable the shipped meme interactions");
         sender.sendMessage("  /" + label + " chat on|off - toggle the Minecraft chat mirror");
+        sender.sendMessage("  /" + label + " account list|add <username> [player]|remove <username>|target <username> <player|clear>");
+        sender.sendMessage("  /" + label + " connect|disconnect|reconnect [username|all]");
         sender.sendMessage("  /" + label + " creator [name] - show or change the creator");
         sender.sendMessage("  /" + label + " rules list|enable <id>|disable <id> - manage the rules");
         sender.sendMessage("  /" + label + " functions list|preview <id>|run <id> - manage the functions");
@@ -162,6 +167,7 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
                 owner.liveService() == null ? LiveConnectionState.STOPPED : owner.liveService().state();
         sender.sendMessage("TikTokMinecraft");
         sender.sendMessage("  State: " + state);
+        listAccounts(sender);
         sender.sendMessage("  Creator: @" + owner.config().uniqueId());
         sender.sendMessage("  Hot Reload: " + (owner.hotReloadEnabled() ? "enabled" : "disabled"));
         sender.sendMessage("  Last File Reload: " + owner.hotReloadStatus());
@@ -208,35 +214,46 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
         return (seconds / 3600) + "h " + ((seconds % 3600) / 60) + "m " + (seconds % 60) + "s";
     }
 
-    private void connect(CommandSender sender) {
-        if (plugin.liveService() == null) {
-            sender.sendMessage("The plugin is not running.");
-            return;
+    private void connection(CommandSender sender, String[] args, String action) {
+        String name = args.length < 2 ? plugin.config().uniqueId()
+                : dev.nglmercer.tiktokminecraft.config.PluginConfig.normalizeUniqueId(args[1]);
+        java.util.Collection<dev.nglmercer.tiktokminecraft.tiktok.TikTokLiveService> selected;
+        if (name.equalsIgnoreCase("all")) selected = plugin.connections().values();
+        else {
+            var service = plugin.connections().get(name.toLowerCase(Locale.ROOT));
+            if (service == null) { sender.sendMessage("Unknown account: @" + name); return; }
+            selected = List.of(service);
         }
-        if (plugin.liveService().state().isActive()) {
-            sender.sendMessage("Already connected or connecting.");
-            return;
+        for (var service : selected) {
+            switch (action) {
+                case "connect" -> service.connect();
+                case "disconnect" -> service.disconnect();
+                case "reconnect" -> service.reconnect();
+            }
         }
-        plugin.liveService().connect();
-        sender.sendMessage("Connecting to @" + plugin.config().uniqueId() + "...");
+        sender.sendMessage("Connection request: " + action + " " + name);
     }
 
-    private void disconnect(CommandSender sender) {
-        if (plugin.liveService() == null) {
-            sender.sendMessage("The plugin is not running.");
-            return;
+    private void listAccounts(CommandSender sender) {
+        for (var account : plugin.config().accounts()) {
+            var service = plugin.connections().get(account.uniqueId().toLowerCase(Locale.ROOT));
+            sender.sendMessage("  @" + account.uniqueId() + " -> "
+                    + (account.targetPlayer().isEmpty() ? "default target policy" : account.targetPlayer())
+                    + " [" + (service == null ? "STOPPED" : service.state()) + "]");
         }
-        plugin.liveService().disconnect();
-        sender.sendMessage("Disconnected.");
     }
 
-    private void reconnect(CommandSender sender) {
-        if (plugin.liveService() == null) {
-            sender.sendMessage("The plugin is not running.");
+    private void account(CommandSender sender, String[] args) {
+        if (args.length == 2 && args[1].equalsIgnoreCase("list")) { listAccounts(sender); return; }
+        String action = args.length > 1 ? args[1].toLowerCase(Locale.ROOT) : "";
+        if (args.length < 3 || !List.of("add", "remove", "target").contains(action)
+                || (action.equals("target") && args.length != 4)) {
+            sender.sendMessage("Usage: /tiktok account list|add <username> [player]|remove <username>|target <username> <player|clear>");
             return;
         }
-        plugin.liveService().reconnect();
-        sender.sendMessage("Reconnecting to @" + plugin.config().uniqueId() + "...");
+        String target = args.length > 3 && !args[3].equalsIgnoreCase("clear") ? args[3] : "";
+        String problem = plugin.editAccount(action, args[2], target);
+        sender.sendMessage(problem == null ? "Account updated and saved." : problem);
     }
 
     private void reload(CommandSender sender) {
@@ -669,6 +686,12 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
         }
         String sub = args[0].toLowerCase(Locale.ROOT);
         if (args.length == 2) {
+            if (sub.equals("account")) return filter(List.of("list", "add", "remove", "target"), args[1]);
+            if (List.of("connect", "disconnect", "reconnect").contains(sub)) {
+                List<String> names = new ArrayList<>(plugin.connections().keySet());
+                names.add("all");
+                return filter(names, args[1]);
+            }
             if (sub.equals("chat") || sub.equals("debug")) {
                 return filter(Arrays.asList("on", "off"), args[1]);
             }
@@ -692,6 +715,14 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
             if (sub.equals("jobs")) {
                 return filter(Arrays.asList("list", "cancel"), args[1]);
             }
+        }
+        if (args.length == 3 && sub.equals("account") && !args[1].equalsIgnoreCase("add"))
+            return filter(new ArrayList<>(plugin.connections().keySet()), args[2]);
+        if (args.length == 4 && sub.equals("account")) {
+            List<String> names = new ArrayList<>();
+            plugin.getServer().getOnlinePlayers().forEach(player -> names.add(player.getName()));
+            names.add("clear");
+            return filter(names, args[3]);
         }
         if (args.length == 3 && sub.equals("rules")) {
             List<String> ids = new ArrayList<String>();
