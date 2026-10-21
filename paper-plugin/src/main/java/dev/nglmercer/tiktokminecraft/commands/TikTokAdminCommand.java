@@ -163,6 +163,8 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("TikTokMinecraft");
         sender.sendMessage("  State: " + state);
         sender.sendMessage("  Creator: @" + owner.config().uniqueId());
+        sender.sendMessage("  Hot Reload: " + (owner.hotReloadEnabled() ? "enabled" : "disabled"));
+        sender.sendMessage("  Last File Reload: " + owner.hotReloadStatus());
         sender.sendMessage("  Room ID: " + (owner.liveService() == null
                 ? "-" : display(owner.liveService().roomId())));
         sender.sendMessage("  Uptime: " + uptime());
