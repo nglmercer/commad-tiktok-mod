@@ -80,6 +80,12 @@ security:
   # Allow raw command actions.
   allow-raw-commands: false
 
+# Changes made in an editor are validated and applied without /tiktok reload.
+# A failed reload keeps the previously loaded configuration and rules.
+hot-reload:
+  enabled: true
+  debounce-ms: 750
+
 debug:
   # Log every received event.
   log-events: false
