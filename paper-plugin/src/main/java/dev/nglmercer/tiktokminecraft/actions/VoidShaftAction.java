@@ -130,8 +130,8 @@ public final class VoidShaftAction extends Action {
                 while (restored < 128 && iterator.hasNext()) {
                     Block block = iterator.next();
                     BlockState old = removed.remove(block);
-                    if (old != null && block.getType().isAir()
-                            && block.getWorld().isChunkLoaded(block.getX() >> 4, block.getZ() >> 4))
+                    if (old != null && block.getWorld().isChunkLoaded(
+                            block.getX() >> 4, block.getZ() >> 4) && block.getType().isAir())
                         old.update(true, false);
                     restored++;
                 }
@@ -144,8 +144,8 @@ public final class VoidShaftAction extends Action {
     public void restoreAll() {
         for (Map.Entry<Block, BlockState> entry : new ArrayList<>(removed.entrySet())) {
             Block block = entry.getKey();
-            if (block.getType().isAir()
-                    && block.getWorld().isChunkLoaded(block.getX() >> 4, block.getZ() >> 4))
+            if (block.getWorld().isChunkLoaded(block.getX() >> 4, block.getZ() >> 4)
+                    && block.getType().isAir())
                 entry.getValue().update(true, false);
         }
         removed.clear();
