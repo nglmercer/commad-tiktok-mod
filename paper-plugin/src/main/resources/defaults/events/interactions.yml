@@ -1,0 +1,149 @@
+# Gift IDs verified against the user-provided 719-gift TikTok catalog.
+# xN is Minecraft EFFECT count per gift, NOT N gifts required.
+# Non-streak gifts and completed streak gifts arrive as gift.final through the SDK.
+# Big presets are intentionally capped by per-event/per-minute budgets.
+rules:
+  - id: meme-likes-zombie
+    enabled: true
+    trigger: like
+    aggregate:
+      metric: count
+      scope: global
+      threshold: 150
+      carry-remainder: true
+    actions:
+      - type: spawn-entity
+        entity: minecraft:zombie
+        count: 1
+        target: nearest-online
+
+  - id: meme-rose-tnt
+    enabled: true
+    trigger: gift.final
+    match:
+      gift-id: '5655'
+    actions:
+      - type: prime-tnt
+        count: 2
+        multiply-by-repeat: true
+        fuse-ticks: 80
+        burst-size: 4
+        target: nearest-online
+
+  - id: meme-confetti-tnt
+    enabled: false # Extremely destructive: opt in explicitly
+    trigger: gift.final
+    match:
+      gift-id: '5585'
+    actions:
+      - type: prime-tnt
+        count: 30000 # Request 30k; runtime caps to max-entities-per-event (maximum 128)
+        fuse-ticks: 90
+        burst-size: 8
+        target: nearest-online
+
+  - id: meme-rosa-charged-creeper
+    enabled: true
+    trigger: gift.final
+    match:
+      gift-id: '8913'
+    actions:
+      - type: spawn-entity
+        entity: minecraft:creeper
+        charged: true
+        count: 1
+        multiply-by-repeat: true
+        target: nearest-online
+
+  - id: meme-finger-heart-webs
+    enabled: true
+    trigger: gift.final
+    match:
+      gift-id: '5487'
+    actions:
+      - type: place-cobweb
+        multiply-by-repeat: true
+        count: 6
+        restore-seconds: 12
+        target: nearest-online
+
+  - id: meme-share-apples
+    enabled: true
+    trigger: social.share
+    actions:
+      - type: give-item
+        material: minecraft:enchanted_golden_apple
+        count: 3
+        target: nearest-online
+
+  - id: meme-cap-wardens
+    enabled: false # Disable by default: ten wardens can destroy survival gameplay
+    trigger: gift.final
+    match:
+      gift-id: '6104'
+    actions:
+      - type: spawn-entity
+        entity: minecraft:warden
+        count: 10
+        multiply-by-repeat: true
+        max-effective-count: 10
+        target: nearest-online
+
+  - id: meme-corgi-inventory
+    enabled: false # Temporary inventory removal: test on a disposable world first
+    trigger: gift.final
+    match:
+      gift-id: '6267'
+    actions:
+      - type: temporary-clear-inventory
+        restore-seconds: 8
+        target: nearest-online
+
+  - id: meme-capybara-lightning
+    enabled: true
+    trigger: gift.final
+    match:
+      gift-id: '14488'
+    actions:
+      - type: lightning-effect
+        multiply-by-repeat: true
+        count: 15
+        target: nearest-online
+
+  - id: meme-doughnut-minus-one
+    enabled: false # The depicted Minecraft inventory icon is ambiguous: assumed Totem
+    trigger: gift.final
+    match:
+      gift-id: '5879'
+    actions:
+      - type: remove-item
+        material: minecraft:totem_of_undying
+        multiply-by-repeat: true
+        count: 1
+        target: nearest-online
+
+  - id: meme-fireworks-skeletons
+    enabled: true
+    trigger: gift.final
+    match:
+      gift-id: '6090'
+    actions:
+      - type: spawn-entity
+        entity: minecraft:wither_skeleton
+        count: 10
+        multiply-by-repeat: true
+        max-effective-count: 10
+        target: nearest-online
+
+  - id: meme-money-gun-withers
+    enabled: false # Request 500, cap actual spawned to 3 per activation
+    trigger: gift.final
+    match:
+      gift-id: '7168' # Money Gun, not Gem Gun
+    actions:
+      - type: spawn-entity
+        entity: minecraft:wither
+        count: 500
+        multiply-by-repeat: true
+        max-effective-count: 3
+        target: nearest-online

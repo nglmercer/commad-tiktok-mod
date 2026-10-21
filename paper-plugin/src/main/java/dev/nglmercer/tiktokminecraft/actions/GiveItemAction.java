@@ -4,7 +4,6 @@ import dev.nglmercer.tiktokminecraft.rules.ActionSpec;
 import java.util.List;
 import java.util.Map;
 import org.bukkit.Material;
-import org.bukkit.Registry;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -19,7 +18,7 @@ public final class GiveItemAction extends Action {
     @Override
     public void validate(ActionSpec spec, ActionContext context) throws ActionException {
         String material = require(spec, "material");
-        if (Registry.MATERIAL.get(ParticleAction.key(material)) == null) {
+        if (Material.matchMaterial(material) == null) {
             throw new ActionException("Unknown material: " + material);
         }
         int count = optionalInt(spec, "count", 1);
@@ -32,7 +31,7 @@ public final class GiveItemAction extends Action {
     public ActionResult execute(ActionSpec spec, ActionContext context)
             throws ActionException {
         String material = spec.string("material", "");
-        Material type = Registry.MATERIAL.get(ParticleAction.key(material));
+        Material type = Material.matchMaterial(material);
         if (type == null) {
             return ActionResult.failed("Unknown material: " + material);
         }

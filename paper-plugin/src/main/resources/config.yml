@@ -54,13 +54,9 @@ functions:
   max-repeat: 20
   # Maximum nesting depth of nested functions.
   max-depth: 8
-  # Command roots a function may execute. Everything else is rejected.
+  # Function JSONs are administrator-authored; no per-command whitelist.
   allowed-commands:
-    - summon
-    - title
-    - playsound
-    - particle
-    - effect
+    - '*'
 
 actions:
   # Where an action looks for its target player:
@@ -69,17 +65,18 @@ actions:
   # What to do when no player is eligible: skip or console
   no-player-policy: skip
   # Entity spawning limits.
-  max-entities-per-event: 5
-  max-entities-per-minute: 60
+  max-entities-per-event: 64
+  max-entities-per-minute: 240
   # Entity types an action may spawn. Empty denies all entity spawning.
-  allowed-entities: []
+  allowed-entities:
+    - '*'  # Admin-authored rules only; per-event caps still apply
 
 security:
   # Master switch for actions triggered by a live event. Keep it false until
   # the rules and functions have been tested.
-  execute-live-actions: false
+  execute-live-actions: true
   # Allow actions to run console commands.
-  allow-console-commands: false
+  allow-console-commands: true
   # Allow raw command actions.
   allow-raw-commands: false
 

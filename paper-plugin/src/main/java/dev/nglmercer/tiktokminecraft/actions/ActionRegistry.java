@@ -31,6 +31,11 @@ public final class ActionRegistry {
         register(new TeleportAction());
         register(new FunctionAction());
         register(new CommandAction());
+        register(new PrimeTntAction());
+        register(new LightningAction());
+        register(new PlaceCobwebAction());
+        register(new RemoveItemAction());
+        register(new ClearInventoryAction());
     }
 
     private void register(Action action) {

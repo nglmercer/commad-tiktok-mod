@@ -35,7 +35,8 @@ class DefaultsTest {
         "defaults/events/gifts.yml",
         "defaults/events/likes.yml",
         "defaults/events/social.yml",
-        "defaults/events/members.yml"
+        "defaults/events/members.yml",
+        "defaults/events/interactions.yml"
     };
 
     private static final String[] DEFAULT_FUNCTION_FILES = {

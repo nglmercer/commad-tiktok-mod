@@ -230,12 +230,12 @@ More complete examples are in [examples/](examples/).
 
 ## Security defaults
 
-A fresh install is safe:
+The Chaos preset ships with these settings:
 
 ```yaml
 security:
-  execute-live-actions: false   # no live event may change the world
-  allow-console-commands: false
+  execute-live-actions: true    # Chaos preset enables its active rules
+  allow-console-commands: true
   allow-raw-commands: false
 ```
 
@@ -304,3 +304,19 @@ and the SDK's own analysis ship inside the JAR as `META-INF/LICENSE.protobuf`
 and `META-INF/THIRD_PARTY_NOTICES.md`. Read
 [THIRD-PARTY-NOTICES.md](paper-plugin/src/main/resources/THIRD-PARTY-NOTICES.md)
 before you redistribute the plugin.
+
+## Chaos interaction preset
+
+The bundled `events/interactions.yml` maps 150 likes to a zombie, Rose to two
+primed TNT per gift, Rosa to charged creepers, Finger Heart to temporary webs,
+shares to enchanted golden apples, Capybara to visual lightning, and Fireworks
+to Wither skeletons. Confetti, Cap, Corgi, Doughnut and Money Gun rules are
+disabled until an administrator enables them. Requested entity counts are capped
+at 64 per event and 240 per minute by default; Money Gun additionally caps at
+three Withers. Functions allow administrator-authored commands, while raw
+command actions remain disabled and `/tiktok` administration requires OP.
+
+Use `/tiktok test gift 5655 5` to simulate a five-Rose streak, or
+`/tiktok test like 450` for three like-threshold activations.
+Temporary inventory escrow is memory-only: keep Corgi disabled unless you accept
+item loss after an abrupt shutdown. Temporary cobwebs may also remain after a crash.

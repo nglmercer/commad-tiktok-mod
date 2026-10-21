@@ -36,10 +36,14 @@ public final class SpawnEntityAction extends Action {
         if (count < 1) {
             throw new ActionException("'count' must be at least 1");
         }
-        if (count > context.config().maxEntitiesPerEvent()) {
-            throw new ActionException(
-                    "'count' is above the per-event entity limit of "
-                            + context.config().maxEntitiesPerEvent());
+        // Rule count is a requested quantity; execution applies the configured
+        // per-event and per-minute limits instead of rejecting joke-sized rules.
+        if (count > 30000) throw new ActionException("'count' must not exceed 30000");
+        int limit = optionalInt(spec, "max-effective-count", 128);
+        if (limit < 1 || limit > 128) throw new ActionException("max-effective-count must be 1..128");
+        if (spec.parameter("charged") != null &&
+                !(spec.parameter("charged") instanceof Boolean)) {
+            throw new ActionException("charged must be a boolean");
         }
     }
 
@@ -51,7 +55,8 @@ public final class SpawnEntityAction extends Action {
         if (key == null) {
             return ActionResult.failed("Invalid entity type");
         }
-        if (!context.config().allowedEntities().contains(key.getKey().toLowerCase(Locale.ROOT))
+        if (!context.config().allowedEntities().contains("*")
+                && !context.config().allowedEntities().contains(key.getKey().toLowerCase(Locale.ROOT))
                 && !context.config().allowedEntities().contains(name.toLowerCase(Locale.ROOT))) {
             return ActionResult.skipped(
                     "The entity type is not in actions.allowed-entities");
@@ -66,9 +71,18 @@ public final class SpawnEntityAction extends Action {
             return ActionResult.skipped("No eligible target");
         }
         int requested = optionalInt(spec, "count", 1);
+        if (Boolean.parseBoolean(optional(spec, "multiply-by-repeat", "false"))
+                && context.event() != null) {
+            Object repeat = context.event().payload().get("gift.repeatCount");
+            if (repeat instanceof Number) requested = (int) Math.min(30000L,
+                    (long) requested * Math.max(1L, ((Number) repeat).longValue()));
+        }
+        int limit = optionalInt(spec, "max-effective-count", 128);
+        int effective = Math.min(requested,
+                Math.min(limit, context.config().maxEntitiesPerEvent()));
         int spawned = 0;
         for (Player player : players) {
-            for (int index = 0; index < requested; index++) {
+            for (int index = 0; index < effective; index++) {
                 if (!context.consumeEntitySlot()) {
                     return ActionResult.ok(
                             "Spawned " + spawned + " entity/entities before the limit");
@@ -79,6 +93,10 @@ public final class SpawnEntityAction extends Action {
                 }
                 try {
                     Entity entity = location.getWorld().spawnEntity(location, type);
+                    if (Boolean.TRUE.equals(spec.parameter("charged"))
+                            && entity instanceof org.bukkit.entity.Creeper) {
+                        ((org.bukkit.entity.Creeper) entity).setPowered(true);
+                    }
                     spawned++;
                 } catch (RuntimeException failure) {
                     return ActionResult.failed(
@@ -97,7 +115,8 @@ public final class SpawnEntityAction extends Action {
      */
     private static Location safeLocation(Player player) {
         Location base = player.getLocation();
-        if (!base.isWorldLoaded() || !base.getChunk().isLoaded()) {
+        if (!base.isWorldLoaded() || !base.getWorld().isChunkLoaded(
+                base.getBlockX() >> 4, base.getBlockZ() >> 4)) {
             return null;
         }
         Location location = base.clone().add(0.0, 1.0, 0.0);
