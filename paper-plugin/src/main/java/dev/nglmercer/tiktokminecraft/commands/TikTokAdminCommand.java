@@ -8,6 +8,11 @@ import dev.nglmercer.tiktokminecraft.functions.FunctionJobManager;
 import dev.nglmercer.tiktokminecraft.log.LogCategory;
 import dev.nglmercer.tiktokminecraft.rules.EventRule;
 import dev.nglmercer.tiktokminecraft.tiktok.LiveConnectionState;
+import java.io.InputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,7 +42,7 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBCOMMANDS = Collections.unmodifiableList(
             Arrays.asList(
                     "help", "status", "connect", "disconnect", "reconnect", "reload",
-                    "chat", "creator", "rules", "functions", "jobs", "test", "debug"));
+                    "chat", "creator", "rules", "functions", "jobs", "test", "debug", "preset"));
 
     private final TikTokMinecraftPlugin plugin;
     private final Instant startedAt = Instant.now();
@@ -98,6 +103,9 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
             case "reload":
                 reload(sender);
                 return true;
+            case "preset":
+                installPreset(sender, args);
+                return true;
             case "chat":
                 chat(sender, args);
                 return true;
@@ -133,6 +141,7 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("  /" + label + " disconnect - disconnect and stay offline");
         sender.sendMessage("  /" + label + " reconnect - reconnect immediately");
         sender.sendMessage("  /" + label + " reload - reload the configuration, rules and functions");
+        sender.sendMessage("  /" + label + " preset install - back up and enable the shipped meme interactions");
         sender.sendMessage("  /" + label + " chat on|off - toggle the Minecraft chat mirror");
         sender.sendMessage("  /" + label + " creator [name] - show or change the creator");
         sender.sendMessage("  /" + label + " rules list|enable <id>|disable <id> - manage the rules");
@@ -254,6 +263,59 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
         plugin.saveConfig();
         plugin.reload();
         sender.sendMessage("Minecraft chat mirror " + (enabled ? "enabled" : "disabled") + ".");
+    }
+
+    /** Installs the current shipped preset without overwriting the old file silently. */
+    private void installPreset(CommandSender sender, String[] args) {
+        if (args.length != 2 || !"install".equalsIgnoreCase(args[1])) {
+            sender.sendMessage("Usage: /tiktok preset install");
+            return;
+        }
+        Path dir = plugin.getDataFolder().toPath().resolve("events");
+        Path destination = dir.resolve("interactions.yml");
+        Path backup = null;
+        try {
+            Files.createDirectories(dir);
+            if (Files.exists(destination)) {
+                backup = dir.resolve("interactions.yml.bak-" + System.currentTimeMillis());
+                Files.copy(destination, backup);
+            }
+            try (InputStream input = plugin.getResource("defaults/events/interactions.yml")) {
+                if (input == null) throw new IOException("Missing packaged interactions.yml");
+                Files.copy(input, destination, StandardCopyOption.REPLACE_EXISTING);
+            }
+            boolean oldActions = plugin.getConfig().getBoolean("security.execute-live-actions");
+            boolean oldEvents = plugin.getConfig().getBoolean("events.enabled", true);
+            plugin.getConfig().set("security.execute-live-actions", true);
+            plugin.getConfig().set("events.enabled", true);
+            plugin.saveConfig();
+            List<String> errors = plugin.reload();
+            if (!errors.isEmpty()) {
+                if (backup == null) Files.deleteIfExists(destination);
+                else Files.copy(backup, destination, StandardCopyOption.REPLACE_EXISTING);
+                plugin.getConfig().set("security.execute-live-actions", oldActions);
+                plugin.getConfig().set("events.enabled", oldEvents);
+                plugin.saveConfig();
+                plugin.reload();
+                sender.sendMessage("Preset validation failed; previous rules restored: " + errors);
+                return;
+            }
+            for (EventRule rule : plugin.rules().rules()) {
+                if (rule.id().startsWith("meme-"))
+                    plugin.ruleEngine().setEnabled(rule.id(), true);
+            }
+            sender.sendMessage("Enabled the latest meme preset (" + plugin.rules().size()
+                    + " total rules). Previous interactions.yml backup: "
+                    + (backup == null ? "(no previous file)" : backup.getFileName()));
+        } catch (IOException failure) {
+            sender.sendMessage("Could not install preset: " + failure.getMessage());
+            if (backup != null) {
+                try {
+                    Files.copy(backup, destination, StandardCopyOption.REPLACE_EXISTING);
+                    plugin.reload();
+                } catch (IOException ignored) { /* report the original error */ }
+            }
+        }
     }
 
     private void rules(CommandSender sender, String[] args) {
@@ -583,6 +645,9 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
             }
             if (sub.equals("rules")) {
                 return filter(Arrays.asList("list", "enable", "disable"), args[1]);
+            }
+            if (sub.equals("preset")) {
+                return filter(Collections.singletonList("install"), args[1]);
             }
             if (sub.equals("creator")) {
                 return filter(
