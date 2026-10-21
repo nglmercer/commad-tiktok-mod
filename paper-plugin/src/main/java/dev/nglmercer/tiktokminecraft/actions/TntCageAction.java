@@ -77,6 +77,10 @@ public final class TntCageAction extends Action {
         }
         if (shell.size() > 260) return ActionResult.skipped("TNT cage block budget exceeded");
 
+        // Reserve the primed-entity budget now, not inside a delayed task.
+        // Confetti may also enqueue bursts of primed TNT during this same event.
+        if (ignite && !context.consumeEntitySlot())
+            return ActionResult.skipped("Entity budget unavailable for cage ignition");
         for (Block block : shell) {
             pendingRestorations.put(block, block.getState());
             block.setType(Material.TNT, false);
@@ -92,7 +96,6 @@ public final class TntCageAction extends Action {
                 if (!context.plugin().isEnabled() || ignition.getType() != Material.TNT
                         || !world.isChunkLoaded(ignition.getX() >> 4, ignition.getZ() >> 4))
                     return;
-                if (!context.consumeEntitySlot()) return;
                 ignition.setType(Material.AIR, false);
                 Location pos = ignition.getLocation().add(0.5, 0.5, 0.5);
                 TNTPrimed primed = world.spawn(pos, TNTPrimed.class);
@@ -116,11 +119,9 @@ public final class TntCageAction extends Action {
 
     private void restore(List<Block> blocks) {
         for (Block block : blocks) {
+            if (!block.getWorld().isChunkLoaded(block.getX() >> 4, block.getZ() >> 4)) continue;
             BlockState old = pendingRestorations.remove(block);
-            if (old != null && block.getType() == Material.TNT
-                    && block.getWorld().isChunkLoaded(block.getX() >> 4, block.getZ() >> 4)) {
-                old.update(true, false);
-            }
+            if (old != null && block.getType() == Material.TNT) old.update(true, false);
         }
     }
 
