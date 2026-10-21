@@ -31,6 +31,28 @@ class MemeActionValidationTest {
                 new ActionSpec("tnt-cage", Map.of("ignite", "yes")), context()));
     }
 
+    @Test void blockCageAcceptsConfigurableSolidBlocks() {
+        Action action = new BlockCageAction();
+        assertDoesNotThrow(() -> action.validate(new ActionSpec("block-cage",
+                Map.of("material", "minecraft:obsidian", "radius", 2,
+                        "height", 3, "restore-seconds", 30)), context()));
+        assertDoesNotThrow(() -> action.validate(new ActionSpec("block-cage",
+                Map.of("material", "minecraft:glass", "radius", 1)), context()));
+        assertDoesNotThrow(() -> action.validate(new ActionSpec("block-cage",
+                Map.of("material", "minecraft:tnt", "radius", 1,
+                        "occupant", "minecraft:creeper", "occupant-charged", true)), context()));
+        assertThrows(ActionException.class, () -> action.validate(new ActionSpec("block-cage",
+                Map.of("material", "minecraft:diamond_sword")), context()));
+        assertThrows(ActionException.class, () -> action.validate(new ActionSpec("block-cage",
+                Map.of("material", "minecraft:obsidian", "ignite", true)), context()));
+        assertThrows(ActionException.class, () -> action.validate(new ActionSpec("block-cage",
+                Map.of("material", "minecraft:glass", "occupant-charged", true)), context()));
+        assertThrows(ActionException.class, () -> action.validate(new ActionSpec("block-cage",
+                Map.of("material", "minecraft:glass", "radius", 6)), context()));
+        assertThrows(ActionException.class, () -> action.validate(new ActionSpec("block-cage",
+                Map.of("material", "minecraft:air")), context()));
+    }
+
     @Test void voidShaftBoundsPerTickOperationsAndBlockChanges() {
         Action action = new VoidShaftAction();
         assertDoesNotThrow(() -> action.validate(new ActionSpec("void-shaft",
@@ -47,6 +69,7 @@ class MemeActionValidationTest {
     @Test void actionsAreDiscoverableByName() {
         ActionRegistry registry = new ActionRegistry();
         assertTrue(registry.contains("tnt-cage"));
+        assertTrue(registry.contains("block-cage"));
         assertTrue(registry.contains("void-shaft"));
     }
 }
