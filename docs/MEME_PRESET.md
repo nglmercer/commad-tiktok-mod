@@ -1,6 +1,8 @@
 # Complete TikTok LIVE → Minecraft meme preset
 
-This project ships a 12-interaction Minecraft meme panel, plus a native TNT cage for expensive gifts.
+This project ships a 12-interaction Minecraft meme panel and a configurable
+`block-cage` action. The same code handles TNT, obsidian, glass and other
+placeable solid Minecraft blocks.
 The preset is in `paper-plugin/src/main/resources/defaults/events/interactions.yml`.
 All rules are enabled in the new default. **Use this on a disposable Minecraft world**.
 
@@ -32,7 +34,7 @@ Raw console command permissions are **not** required by the two new native Paper
 | TikTok gift/event | Rule | Minecraft outcome |
 |---|---|---|
 | 150 likes | `meme-likes-zombie` | Spawn 1 zombie per threshold |
-| Rose (5655) | `meme-rose-tnt` | 2 primed TNT per rose |
+| Rose (5655) | `meme-rose-charged-creeper-cage` | Small TNT cage with a charged creeper inside |
 | Confetti (5585) | `meme-confetti-tnt` | Request 30,000 TNT, bounded by server entity budgets |
 | Rosa (8913) | `meme-rosa-charged-creeper` | Spawn a charged creeper |
 | Finger Heart (5487) | `meme-finger-heart-webs` | Place 6 temporary cobwebs |
@@ -44,10 +46,66 @@ Raw console command permissions are **not** required by the two new native Paper
 | Fireworks (6090) | `meme-fireworks-skeletons` | Spawn 10 wither skeletons |
 | Money Gun (7168) | `meme-money-gun-withers` | Request 500 Withers, capped to 3 per activation |
 
-### Bonus: TNT cage on expensive gifts
+### Generic block cages: TNT, obsidian, glass, etc.
 
-`meme-high-value-tnt-cage` listens for a gift worth **100+ diamonds per unit**.
-It uses the new `tnt-cage` action, not console commands or `/fill`.
+Use `block-cage` in any gift rule and set `material` to a Minecraft **block**.
+It does not require console `/fill` or extra permissions.
+
+- `material`: e.g. `minecraft:tnt`, `minecraft:obsidian`, `minecraft:glass`
+- `radius`: 1–3 blocks around the player's center; `radius: 1` is a 3×3 cage
+- `height`: 3–6 blocks above the player's feet (floor/roof included)
+- `restore-seconds`: 1–120 for temporary cages, or 0 to keep the cage
+- `ignite`: optional, **TNT only**; primes a block after `ignite-delay-ticks`
+- `occupant`: optional entity to spawn inside the cage
+- `occupant-charged`: optional true for `minecraft:creeper`, false otherwise
+- `target`: optional player selector, such as `nearest-online`
+
+`tnt-cage` remains a compatible alias of `block-cage`, with default
+`material: minecraft:tnt`. Both aliases share temporary block tracking, so
+a second cage cannot silently overwrite an active first cage.
+
+**Rose (5655)** now creates a small TNT cage with a charged creeper,
+as one atomic action on the same selected player:
+
+```yaml
+- id: meme-rose-charged-creeper-cage
+  enabled: true
+  trigger: gift.final
+  match:
+    gift-id: '5655'
+  actions:
+    - type: block-cage
+      material: minecraft:tnt
+      radius: 1
+      height: 3
+      occupant: minecraft:creeper
+      occupant-charged: true
+      ignite: false
+      restore-seconds: 20
+      target: nearest-online
+```
+
+**Obsidian cage example** (copy into a separate rule file or edit
+`interactions.yml`; a complete optional example is in
+`examples/obsidian-cage.yml`):
+
+```yaml
+- id: demo-obsidian-cage
+  enabled: true
+  trigger: gift.final
+  match:
+    gift-id: '5655'
+  actions:
+    - type: block-cage
+      material: minecraft:obsidian
+      radius: 2
+      height: 3
+      restore-seconds: 30
+      target: nearest-online
+```
+
+The high-value bonus rule `meme-high-value-tnt-cage` listens for gifts costing
+**100+ diamonds per unit** and uses the same general-purpose `block-cage` with TNT.
 By default, it creates a 5×5×5 hollow TNT shell centered on the target
 and ignites one block after 40 ticks. The remaining intact TNT blocks are
 restored after 25 seconds. Exploded blocks and collateral terrain are not
@@ -63,7 +121,8 @@ Example:
     diamonds:
       greater-or-equal: 100
   actions:
-    - type: tnt-cage
+    - type: block-cage
+      material: minecraft:tnt
       radius: 2
       height: 3
       ignite: true
@@ -134,7 +193,7 @@ catalog for the correct `gift.diamonds` value.
 - Money Gun requests 500 Withers but deliberately spawns at most 3 per event.
 - Event commands are only available to operators (admin permission);
   ordinary TikTok viewers cannot run server commands.
-- `void-shaft` and `tnt-cage` restore their own unchanged blocks on
+- `void-shaft` and `block-cage` restore their own unchanged blocks on
   scheduled cleanup and plugin disable, but cannot guarantee restoration
   across server crashes, unloaded chunks, or explosion-caused terrain changes.
 
