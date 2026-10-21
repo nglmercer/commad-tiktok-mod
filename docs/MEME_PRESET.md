@@ -137,3 +137,19 @@ catalog for the correct `gift.diamonds` value.
 - `void-shaft` and `tnt-cage` restore their own unchanged blocks on
   scheduled cleanup and plugin disable, but cannot guarantee restoration
   across server crashes, unloaded chunks, or explosion-caused terrain changes.
+
+## Editing interactions without restarting Minecraft
+
+Hot reload is enabled by default. Edit
+`plugins/TikTokMinecraft/events/interactions.yml` directly in a text editor,
+save, and watch the Paper console for `Hot reload applied`.
+There is no need to restart Minecraft or disconnect from the active LIVE.
+
+Edits to `config.yml`, function JSON files, `.mcfunction` files and
+`.ttl` DSL scripts are also watched. Updates are debounced and validated
+before being applied. A malformed rule or function is rejected without
+replacing the last working one. Check `/tiktok status` for the last
+hot-reload outcome, or run `/tiktok reload` manually.
+
+Use `hot-reload.enabled: false` in `config.yml` to disable automatic reload.
+After disabling it, you must run `/tiktok reload` to re-enable it.
