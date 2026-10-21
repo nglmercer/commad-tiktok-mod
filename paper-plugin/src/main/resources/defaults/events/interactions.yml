@@ -144,7 +144,7 @@ rules:
     actions:
       - type: void-shaft
         radius: 1
-        max-blocks: 2048
+        max-blocks: 4096
         blocks-per-tick: 96
         restore-seconds: 30
         target: nearest-online
