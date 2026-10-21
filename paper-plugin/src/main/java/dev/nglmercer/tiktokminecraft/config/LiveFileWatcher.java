@@ -24,7 +24,8 @@ import java.util.function.Consumer;
  * Bukkit interaction is delegated to the caller and MUST run on the main thread.
  */
 public final class LiveFileWatcher implements AutoCloseable {
-    private static final int MAX_FILES = 1024;
+    private static final int MAX_FILES = 512;
+    private static final long MAX_TOTAL_BYTES = 16L * 1024 * 1024;
     private static final int MAX_DEPTH = 8;
     private static final long MAX_FILE_SIZE = 2L * 1024 * 1024;
     private final Path root;
@@ -39,6 +40,7 @@ public final class LiveFileWatcher implements AutoCloseable {
     private Map<String, String> pending;
     private long changedAtNanos;
     private boolean initialized;
+    private String lastError;
 
     public LiveFileWatcher(Path root, boolean enabled, long debounceMillis,
             Consumer<List<String>> onSettledChange, Consumer<String> error) {
@@ -70,6 +72,7 @@ public final class LiveFileWatcher implements AutoCloseable {
         if (closed) return;
         try {
             Map<String, String> state = fingerprint();
+            lastError = null;
             if (!initialized) {
                 baseline = state;
                 initialized = true;
@@ -98,7 +101,11 @@ public final class LiveFileWatcher implements AutoCloseable {
                 pending = null;
             }
         } catch (Exception failure) {
-            error.accept("File watcher scan failed: " + failure.getMessage());
+            String message = "File watcher scan failed: " + failure.getMessage();
+            if (!message.equals(lastError)) {
+                lastError = message;
+                error.accept(message);
+            }
         }
     }
 
@@ -123,8 +130,12 @@ public final class LiveFileWatcher implements AutoCloseable {
         }
         if (paths.size() > MAX_FILES) throw new IOException("Too many watched files");
         paths.sort(Comparator.comparing(path -> root.relativize(path).toString()));
+        long totalBytes = 0;
         for (Path path : paths) {
             long size = Files.size(path);
+            totalBytes += size;
+            if (totalBytes > MAX_TOTAL_BYTES)
+                throw new IOException("Watched file size budget exceeded (16 MiB)");
             if (size > MAX_FILE_SIZE) throw new IOException("File too large: " + path.getFileName());
             byte[] bytes = Files.readAllBytes(path);
             MessageDigest digest = digest();
