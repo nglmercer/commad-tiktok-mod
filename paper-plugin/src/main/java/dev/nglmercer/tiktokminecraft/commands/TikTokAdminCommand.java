@@ -434,7 +434,7 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
     private void test(CommandSender sender, String[] args) {
         if (args.length < 2) {
             sender.sendMessage(
-                    "Usage: /tiktok test chat <message> | gift <name> [final|update] | like <count> | follow | share");
+                    "Usage: /tiktok test chat <message> | gift <name|id> [count] [final|update] | like <count> | follow | share");
             return;
         }
         String kind = args[1].toLowerCase(Locale.ROOT);
@@ -450,18 +450,26 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
             event = synthetic(TikTokEventContext.CHAT, chatPayload(message));
         } else if (kind.equals("gift")) {
             String name = args.length > 2 ? args[2] : "Rose";
-            // A gift that has been completed is the event most gift rules
-            // listen for, so that is the default.
-            String trigger = TikTokEventContext.GIFT_FINAL;
+            String mode = "final";
+            long repeats = 1L;
             if (args.length > 3) {
-                if (args[3].equalsIgnoreCase("update")) {
-                    trigger = TikTokEventContext.GIFT;
-                } else if (!args[3].equalsIgnoreCase("final")) {
-                    sender.sendMessage("The gift trigger must be 'final' or 'update'.");
-                    return;
-                }
+                if (args[3].matches("[0-9]+")) {
+                    try { repeats = Long.parseLong(args[3]); }
+                    catch (NumberFormatException error) { repeats = -1; }
+                    if (args.length > 4) mode = args[4];
+                } else mode = args[3];
             }
-            event = synthetic(trigger, giftPayload(name));
+            if (repeats < 1 || repeats > 1000) {
+                sender.sendMessage("Gift repeat must be 1..1000");
+                return;
+            }
+            if (!mode.equalsIgnoreCase("final") && !mode.equalsIgnoreCase("update")) {
+                sender.sendMessage("Gift mode must be final or update");
+                return;
+            }
+            String trigger = mode.equalsIgnoreCase("update")
+                    ? TikTokEventContext.GIFT : TikTokEventContext.GIFT_FINAL;
+            event = synthetic(trigger, giftPayload(name, repeats));
         } else if (kind.equals("like")) {
             long count = 1;
             if (args.length > 2) {
@@ -479,7 +487,7 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
             event = synthetic(TikTokEventContext.SOCIAL_SHARE, socialPayload("share", 3L));
         } else {
             sender.sendMessage(
-                    "Usage: /tiktok test chat <message> | gift <name> | like <count> | follow | share");
+                    "Usage: /tiktok test chat <message> | gift <name|id> [count] [final|update] | like <count> | follow | share");
             return;
         }
         plugin.eventBus().offer(event);
@@ -508,16 +516,35 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
         return payload;
     }
 
-    private static Map<String, Object> giftPayload(String name) {
+    private static Map<String, Object> giftPayload(String name, long repeats) {
         Map<String, Object> payload = new LinkedHashMap<String, Object>();
-        payload.put("gift.id", "0");
+        payload.put("gift.id", giftIdForTest(name));
         payload.put("gift.name", name);
         payload.put("gift.diamonds", Long.valueOf(1));
-        payload.put("gift.repeatCount", Long.valueOf(1));
-        payload.put("gift.comboCount", Long.valueOf(1));
+        payload.put("gift.repeatCount", Long.valueOf(repeats));
+        payload.put("gift.comboCount", Long.valueOf(repeats));
         payload.put("gift.groupId", "0");
         payload.put("gift.repeatEnd", Boolean.TRUE);
         return payload;
+    }
+
+    // Names are only aliases in the synthetic test command; real events use SDK gift IDs.
+    private static String giftIdForTest(String name) {
+        String normalized = name.replace("_", "").replace("-", "").replace(" ", "")
+                .toLowerCase(Locale.ROOT);
+        switch (normalized) {
+            case "rose": return "5655";
+            case "confetti": return "5585";
+            case "rosa": return "8913";
+            case "fingerheart": return "5487";
+            case "cap": return "6104";
+            case "corgi": return "6267";
+            case "capybara": return "14488";
+            case "doughnut": return "5879";
+            case "fireworks": return "6090";
+            case "moneygun": return "7168";
+            default: return name.matches("[0-9]+") ? name : "0";
+        }
     }
 
     private static Map<String, Object> likePayload(long count) {

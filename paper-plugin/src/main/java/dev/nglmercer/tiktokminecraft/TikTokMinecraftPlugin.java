@@ -76,6 +76,10 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
         log = new PluginLog(getLogger());
 
         actionRegistry = new ActionRegistry();
+        // Inventory prank restores the player on logout, timeout or plugin disable.
+        getServer().getPluginManager().registerEvents(
+                (dev.nglmercer.tiktokminecraft.actions.ClearInventoryAction)
+                        actionRegistry.get("temporary-clear-inventory"), this);
         commandDispatcher = new CommandDispatcher(this);
         entityLimiter = new EntityRateLimiter(config.maxEntitiesPerMinute());
 
@@ -137,6 +141,12 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (actionRegistry != null) {
+            ((dev.nglmercer.tiktokminecraft.actions.ClearInventoryAction)
+                    actionRegistry.get("temporary-clear-inventory")).restoreAll();
+            ((dev.nglmercer.tiktokminecraft.actions.PlaceCobwebAction)
+                    actionRegistry.get("place-cobweb")).restoreAll();
+        }
         if (tickTask != null) {
             tickTask.cancel();
             tickTask = null;
@@ -374,6 +384,7 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
         copyDefault("defaults/events/likes.yml", "events/likes.yml");
         copyDefault("defaults/events/social.yml", "events/social.yml");
         copyDefault("defaults/events/members.yml", "events/members.yml");
+        copyDefault("defaults/events/interactions.yml", "events/interactions.yml");
         copyDefault("defaults/functions/effects/welcome.json", "functions/effects/welcome.json");
         copyDefault("defaults/functions/gifts/spawn_zombies.json",
                 "functions/gifts/spawn_zombies.json");

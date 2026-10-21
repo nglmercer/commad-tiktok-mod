@@ -108,6 +108,16 @@ class RuleEngineTest {
         assertEquals(1, engine.match(like("5", 40)).size());
     }
 
+    @Test void oneLargeLikeEventTriggersEveryThresholdUpToBudget() {
+        RuleEngine engine = new RuleEngine(new dev.nglmercer.tiktokminecraft.actions.ActionRegistry());
+        Aggregate aggregate = new Aggregate(Aggregate.Metric.COUNT, Aggregate.Scope.GLOBAL, 150L, true);
+        engine.apply(new RulesSnapshot(Collections.singletonList(
+                rule("likes", TikTokEventContext.LIKE,
+                        Collections.<FieldMatcher>emptyList(), aggregate, null))));
+        assertEquals(3, engine.match(like("burst", 475)).size());
+        assertEquals(1, engine.match(like("remainder", 125)).size());
+    }
+
     @Test void aThresholdWithoutRemainderStartsOver() {
         RuleEngine engine = new RuleEngine(new dev.nglmercer.tiktokminecraft.actions.ActionRegistry());
         Aggregate aggregate =
