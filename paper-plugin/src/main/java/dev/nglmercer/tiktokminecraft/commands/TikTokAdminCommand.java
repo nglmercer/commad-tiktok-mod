@@ -286,8 +286,16 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
             }
             boolean oldActions = plugin.getConfig().getBoolean("security.execute-live-actions");
             boolean oldEvents = plugin.getConfig().getBoolean("events.enabled", true);
+            int oldMaxEvent = plugin.getConfig().getInt("actions.max-entities-per-event", 5);
+            int oldMaxMinute = plugin.getConfig().getInt("actions.max-entities-per-minute", 60);
+            List<String> oldEntities = plugin.getConfig().getStringList("actions.allowed-entities");
             plugin.getConfig().set("security.execute-live-actions", true);
             plugin.getConfig().set("events.enabled", true);
+            // This explicit admin operation opts into the full example; the
+            // original restrictions are kept in the backed up config values.
+            plugin.getConfig().set("actions.allowed-entities", List.of("*"));
+            plugin.getConfig().set("actions.max-entities-per-event", Math.max(64, oldMaxEvent));
+            plugin.getConfig().set("actions.max-entities-per-minute", Math.max(240, oldMaxMinute));
             plugin.saveConfig();
             List<String> errors = plugin.reload();
             if (!errors.isEmpty()) {
@@ -295,6 +303,9 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
                 else Files.copy(backup, destination, StandardCopyOption.REPLACE_EXISTING);
                 plugin.getConfig().set("security.execute-live-actions", oldActions);
                 plugin.getConfig().set("events.enabled", oldEvents);
+                plugin.getConfig().set("actions.allowed-entities", oldEntities);
+                plugin.getConfig().set("actions.max-entities-per-event", oldMaxEvent);
+                plugin.getConfig().set("actions.max-entities-per-minute", oldMaxMinute);
                 plugin.saveConfig();
                 plugin.reload();
                 sender.sendMessage("Preset validation failed; previous rules restored: " + errors);
