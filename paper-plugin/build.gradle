@@ -11,9 +11,14 @@ plugins {
     id 'com.gradleup.shadow' version '9.6.1'
 }
 
+// The Java level of the plugin. The default targets Java 21, which is what
+// Paper 1.21.11 needs. A newer Paper is compile checked with
+// -PjavaRelease=25.
+def javaRelease = providers.gradleProperty('javaRelease').getOrElse('21')
+
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(javaRelease as int)
     }
 }
 
@@ -81,7 +86,7 @@ tasks.register('verifyGraalJs') {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    options.release = 21
+    options.release = javaRelease as int
 }
 
 tasks.named('processResources') {

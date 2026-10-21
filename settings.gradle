@@ -1,3 +1,9 @@
+plugins {
+    // Lets Gradle provision a missing JDK toolchain (Java 25 for a Paper
+    // 26.x compile check) instead of failing on machines that do not have it.
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
 rootProject.name = 'tiktokminecraft'
 
 include 'functions-core'

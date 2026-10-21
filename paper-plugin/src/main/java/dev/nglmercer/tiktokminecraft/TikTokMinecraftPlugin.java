@@ -95,7 +95,7 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
         loadFunctions();
 
         ruleEngine = new RuleEngine(actionRegistry);
-        loadRules();
+        loadRules(config);
 
         eventBus = new EventBus(config);
         chatBridge = new TikTokChatBridge(log, config);
@@ -246,10 +246,16 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
         PluginConfig updated = result.config();
 
         problems.addAll(loadFunctions());
-        problems.addAll(loadRules());
+        problems.addAll(loadRules(updated));
 
         if (!problems.isEmpty()) {
-            // The previous configuration stays active.
+            // The previous configuration stays active, so the engine goes
+            // back to the limits and the allowlist it had before.
+            if (previous != null) {
+                functionEngine.applyConfig(
+                        previous.functionLimits(),
+                        new CommandPolicy(previous.allowedCommands()));
+            }
             return problems;
         }
         config = updated;
@@ -286,12 +292,18 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
         return problems;
     }
 
-    /** Loads the rules. A broken file keeps the previous set active. */
-    private List<String> loadRules() {
+    /**
+     * Loads the rules. A broken file keeps the previous set active.
+     *
+     * @param forValidation the configuration the rules are checked against.
+     *     It is the new one during a reload, so a change to the allowlist or
+     *     to the limits takes effect at once.
+     */
+    private List<String> loadRules(PluginConfig forValidation) {
         List<String> problems = new ArrayList<String>();
         ActionContext validation =
                 new ActionContext(
-                        this, config, functionEngine, log, null, null, entityLimiter);
+                        this, forValidation, functionEngine, log, null, null, entityLimiter);
         YamlRuleLoader loader = new YamlRuleLoader(actionRegistry, validation);
         YamlRuleLoader.LoadResult yaml =
                 loader.load(getDataFolder().toPath().resolve("events"));

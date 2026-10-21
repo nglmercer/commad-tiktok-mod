@@ -77,8 +77,8 @@ public final class FunctionJobManager implements AutoCloseable {
 
     private final Plugin plugin;
     private final FunctionRegistry registry;
-    private final FunctionLimits limits;
-    private final CommandPolicy policy;
+    private volatile FunctionLimits limits;
+    private volatile CommandPolicy policy;
     private final String minecraftVersion;
     private final CommandDispatcher dispatcher;
     private final boolean consoleCommandsAllowed;
@@ -258,6 +258,12 @@ public final class FunctionJobManager implements AutoCloseable {
             }
         }
         return objects;
+    }
+
+    /** Applies new execution limits and a new command allowlist. */
+    public void applyConfig(FunctionLimits limits, CommandPolicy policy) {
+        this.limits = limits;
+        this.policy = policy;
     }
 
     /** The jobs that are still known. */

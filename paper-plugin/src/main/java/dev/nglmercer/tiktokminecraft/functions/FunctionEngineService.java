@@ -34,8 +34,8 @@ public final class FunctionEngineService implements AutoCloseable {
     private final dev.nglmercer.tiktokminecraft.log.PluginLog log;
     private final Path functionRoot;
     private final FunctionRegistry registry = new FunctionRegistry();
-    private final FunctionLimits limits;
-    private final CommandPolicy policy;
+    private volatile FunctionLimits limits;
+    private volatile CommandPolicy policy;
     private final String minecraftVersion;
     private final CommandDispatcher dispatcher;
     private final FunctionJobManager jobs;
@@ -75,6 +75,18 @@ public final class FunctionEngineService implements AutoCloseable {
     /** The directory the functions are read from. */
     public Path functionRoot() {
         return functionRoot;
+    }
+
+    /**
+     * Applies new execution limits and a new command allowlist.
+     *
+     * <p>Both are read when a function is compiled, so a reload that changes
+     * them takes effect on the next run.</p>
+     */
+    public void applyConfig(FunctionLimits limits, CommandPolicy policy) {
+        this.limits = limits;
+        this.policy = policy;
+        jobs.applyConfig(limits, policy);
     }
 
     public FunctionLimits limits() {
