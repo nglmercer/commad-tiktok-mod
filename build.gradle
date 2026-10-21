@@ -1,168 +1,49 @@
-import groovy.json.JsonOutput
-import groovy.json.JsonSlurper
+// TikTokMinecraft — a standalone Paper plugin that bridges TikTok LIVE into
+// Minecraft. The build has two modules:
+//
+//   functions-core  the reusable function engine (no Minecraft, no Paper)
+//   paper-plugin    the Paper plugin: TikTok connection, rules, actions
+//
+// There is no Loom, no Fabric and no multi-version matrix: the plugin targets
+// one Paper API and ships as a single JAR.
 
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
+def tiktokSdkVersion = providers.gradleProperty('tiktokSdkVersion').get()
+def graalJsVersion = providers.gradleProperty('graalJsVersion').get()
+def paperApiVersion = providers.gradleProperty('paperApiVersion').get()
 
-// ---------------------------------------------------------------------------
-// versions.json drives everything: module list, build families, dependency
-// versions, Java levels, artifact names, generated metadata, CI matrix, docs.
-// ---------------------------------------------------------------------------
-def manifestJson = new JsonSlurper().parse(file('versions.json'))
-
-// Read by common/build.gradle and gradle/version-module.gradle.
 ext {
-    manifest = manifestJson
-    modVersion = manifestJson.modVersion
+    tiktokSdkVersion = tiktokSdkVersion
+    graalJsVersion = graalJsVersion
+    paperApiVersion = paperApiVersion
 }
 
 allprojects {
-    group = 'com.commandapi'
-}
+    group = providers.gradleProperty('group').get()
+    version = providers.gradleProperty('version').get()
 
-def specs = manifestJson.versions
-def families = manifestJson.buildFamilies
-def modVersionValue = manifestJson.modVersion
-def outputDir = layout.buildDirectory.dir('distributions')
-
-def versionProjects = { specs.keySet().collect { project(":versions:${it}") } }
-
-/** Artifact file name for a target, e.g. commandapi-1.2.0+mc26.2.jar */
-def artifactNameOf = { String minecraft -> "commandapi-${modVersionValue}+mc${minecraft}.jar" }
-
-/**
- * The task that produces a target's shippable JAR. Legacy targets ship
- * remapJar; unobfuscated 26.x targets have no remap step and ship jar.
- */
-def productionJarTaskOf = { String id -> families[specs[id].buildFamily].productionJarTask }
-
-tasks.register('collectArtifacts') {
-    group = 'build'
-    description = 'Copies every production JAR into build/distributions and writes manifest.json.'
-
-    dependsOn specs.keySet().collect { ":versions:${it}:${productionJarTaskOf(it)}" }
-
-    doLast {
-        def target = outputDir.get().asFile
-        target.mkdirs()
-
-        // Clear stale artifacts so a renamed or removed target cannot linger
-        // here and end up in a release.
-        target.listFiles()?.each { existing ->
-            if (existing.file && (existing.name.endsWith('.jar') || existing.name == 'manifest.json')) {
-                existing.delete()
-            }
+    repositories {
+        // An authoritative remote repository for the TikTok SDK, when the
+        // project publishes one. It is consulted first so production builds
+        // never depend on a developer's Maven Local.
+        def sdkRepository = providers.gradleProperty('tiktokSdkRepositoryUrl').getOrNull()
+        if (sdkRepository) {
+            maven { url = sdkRepository }
         }
-
-        def artifacts = []
-        specs.each { id, spec ->
-            def jarTask = project(":versions:${id}").tasks.named(productionJarTaskOf(id)).get()
-            def source = jarTask.archiveFile.get().asFile
-            if (!source.exists()) {
-                throw new GradleException("Minecraft ${spec.minecraft}: expected ${source} but it was not produced.")
-            }
-            def expected = artifactNameOf(spec.minecraft)
-            if (source.name != expected) {
-                throw new GradleException("Minecraft ${spec.minecraft}: produced ${source.name}, expected ${expected}.")
-            }
-            Files.copy(source.toPath(), new File(target, expected).toPath(),
-                    StandardCopyOption.REPLACE_EXISTING)
-            artifacts << [
-                    minecraft    : spec.minecraft,
-                    java         : spec.java,
-                    loader       : spec.loader,
-                    buildFamily  : spec.buildFamily,
-                    adapterFamily: spec.adapterFamily,
-                    tier         : spec.tier,
-                    jarTask      : productionJarTaskOf(id),
-                    file         : expected,
-                    size         : source.length()
-            ]
-        }
-
-        def buildManifest = [
-                modVersion: modVersionValue,
-                generated : new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
-                artifacts : artifacts
-        ]
-        new File(target, 'manifest.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(buildManifest)) + '\n'
-
-        artifacts.each { println "Minecraft ${it.minecraft} (${it.buildFamily}) ... SUCCESS" }
-        println "\nArtifacts:"
-        artifacts.each { println "  ${target}/${it.file}" }
+        // Development fallback: the SDK publishes snapshots to Maven Local via
+        // `sdk/java` in nglmercer/tiktok-signer.
+        mavenLocal()
+        mavenCentral()
+        maven { url = 'https://repo.papermc.io/repository/maven-public/' }
     }
-}
-
-tasks.register('buildAllVersions') {
-    group = 'build'
-    description = 'Builds every Minecraft target declared in versions.json and collects the artifacts.'
-
-    dependsOn versionProjects().collect { "${it.path}:build" }
-    dependsOn 'collectArtifacts'
-    dependsOn ':common:test'
-
-    doLast {
-        println "\nCommand API ${modVersionValue}: built ${specs.size()} Minecraft target(s)."
-        println "Run './gradlew versionTable' to refresh the generated tables."
-    }
-}
-
-tasks.register('versionTable', Exec) {
-    group = 'documentation'
-    description = 'Regenerates docs/VERSIONS.md and the README table from versions.json + the build manifest.'
-    dependsOn 'collectArtifacts'
-    commandLine 'python3', file('scripts/generate-version-table.py').absolutePath
-    workingDir projectDir
-}
-
-tasks.register('verifyBuilds', Exec) {
-    group = 'verification'
-    description = 'Verifies the collected artifacts against versions.json.'
-    dependsOn 'collectArtifacts'
-    commandLine 'python3', file('scripts/verify-builds.py').absolutePath
-    workingDir projectDir
 }
 
 tasks.register('printVersions') {
     group = 'help'
-    description = 'Prints the configured Minecraft targets.'
+    description = 'Prints the configured build versions.'
     doLast {
-        printf("%-9s %-6s %-8s %-9s %-22s %s%n", 'MC', 'TIER', 'JAVA', 'LOADER', 'BUILD FAMILY', 'ADAPTER')
-        specs.each { id, spec ->
-            printf("%-9s %-6s %-8s %-9s %-22s %s%n", id, spec.tier, spec.java, spec.loader,
-                    spec.buildFamily, spec.adapterFamily)
-        }
-    }
-}
-
-// Server releases are separate from Fabric artifacts and their compatibility manifest.
-tasks.register('buildServerAdapter') {
-    group = 'build'
-    dependsOn ':server-adapter:build'
-}
-tasks.register('collectServerArtifact') {
-    group = 'build'
-    dependsOn ':server-adapter:build'
-    doLast {
-        def target = layout.buildDirectory.dir('server-distributions').get().asFile
-        def artifacts = manifestJson.serverTargets.collect { name, spec ->
-            def task = project(':server-adapter').tasks.named(name == 'modern' ? 'jar' : "${name}Jar").get()
-            [name: name, spec: spec, jar: task.archiveFile.get().asFile]
-        }
-        // Sync generated output so upgrading from the old single JAR cannot publish it by mistake.
-        project.sync { copySpec ->
-            copySpec.from(artifacts.collect { it.jar })
-            copySpec.into(target)
-        }
-        new File(target, 'server-manifest.json').text = JsonOutput.prettyPrint(JsonOutput.toJson([
-            modVersion: modVersionValue, folia: false,
-            artifacts: artifacts.collect { artifact ->
-                [target: artifact.name, file: artifact.jar.name, java: artifact.spec.java,
-                 apiVersion: artifact.spec.apiVersion, minMinecraft: artifact.spec.minMinecraft,
-                 maxMinecraft: artifact.spec.maxMinecraft, spigotApi: artifact.spec.spigotApi,
-                 compatibility: 'compile-and-test verified; runtime evidence recorded separately']
-            },
-            dependencyPolicy: 'Gson provided by Bukkit/Minecraft; shared core bundled'
-        ])) + '\n'
+        println "TikTokMinecraft ${version}"
+        println "  Paper API      : ${paperApiVersion}"
+        println "  TikTok SDK     : ${tiktokSdkVersion}"
+        println "  GraalJS        : ${graalJsVersion}"
     }
 }

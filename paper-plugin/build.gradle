@@ -1,0 +1,167 @@
+// The Paper plugin. Everything the plugin needs at runtime — the TikTok LIVE
+// Java SDK, GraalJS (used by the SDK's embedded signer), OkHttp, Jackson and
+// protobuf — is shaded into a single JAR so the server administrator installs
+// exactly one file and no external service.
+//
+// Gson is deliberately NOT shaded: the Paper server already provides it and
+// duplicating it would break Adventure's Gson serializer.
+
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '9.6.1'
+}
+
+// The Java level of the plugin. The default targets Java 21, which is what
+// Paper 1.21.11 needs. A newer Paper is compile checked with
+// -PjavaRelease=25.
+def javaRelease = providers.gradleProperty('javaRelease').getOrElse('21')
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(javaRelease as int)
+    }
+}
+
+dependencies {
+    compileOnly "io.papermc.paper:paper-api:${rootProject.ext.paperApiVersion}"
+
+    implementation project(':functions-core')
+
+    // The TikTok LIVE Java SDK, consumed as an external dependency.
+    implementation "io.github.nglmercer:tiktok-live-client:${rootProject.ext.tiktokSdkVersion}"
+    implementation "io.github.nglmercer:tiktok-live-jvm-signer:${rootProject.ext.tiktokSdkVersion}"
+
+    // GraalJS is not shaded: it is declared in plugin.yml and loaded by Paper's
+    // own library loader. The concrete artifacts are used here (the
+    // 'js-community' coordinates are POM-only aggregators) so the versions
+    // stay in one place and the build verifies that they exist.
+    compileOnly "org.graalvm.polyglot:polyglot:${rootProject.ext.graalJsVersion}"
+    compileOnly "org.graalvm.js:js-language:${rootProject.ext.graalJsVersion}"
+    compileOnly "org.graalvm.truffle:truffle-runtime:${rootProject.ext.graalJsVersion}"
+
+    testImplementation "io.papermc.paper:paper-api:${rootProject.ext.paperApiVersion}"
+    testImplementation 'com.google.code.gson:gson:2.11.0'
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// The GraalJS runtime is provided by Paper at runtime, so it must never end
+// up inside the plugin JAR. The 'js-community' coordinates are POM-only
+// aggregators and carry no classes; they are excluded together with the
+// whole GraalJS tree.
+configurations.runtimeClasspath {
+    exclude group: 'org.graalvm.polyglot', module: 'js-community'
+    exclude group: 'org.graalvm.polyglot', module: 'polyglot'
+    exclude group: 'org.graalvm.js', module: 'js-community'
+    exclude group: 'org.graalvm.js', module: 'js'
+    exclude group: 'org.graalvm.js', module: 'js-language'
+    exclude group: 'org.graalvm.truffle'
+    exclude group: 'org.graalvm.regex'
+    exclude group: 'org.graalvm.shadowed'
+    exclude group: 'org.graalvm.sdk'
+}
+
+// A resolution-only configuration that proves the GraalJS artifacts declared
+// in plugin.yml actually exist before a release is published.
+configurations {
+    graalJsRuntime
+}
+
+dependencies {
+    graalJsRuntime "org.graalvm.polyglot:polyglot:${rootProject.ext.graalJsVersion}"
+    graalJsRuntime "org.graalvm.js:js-language:${rootProject.ext.graalJsVersion}"
+    graalJsRuntime "org.graalvm.truffle:truffle-runtime:${rootProject.ext.graalJsVersion}"
+}
+
+tasks.register('verifyGraalJs') {
+    group = 'verification'
+    description = 'Resolves the GraalJS artifacts that plugin.yml declares.'
+    doLast {
+        configurations.graalJsRuntime.resolve().each {
+            println "GraalJS runtime: ${it.name}"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = javaRelease as int
+}
+
+tasks.named('processResources') {
+    def tokens = [
+            version: project.version.toString(),
+            graalJsVersion: rootProject.ext.graalJsVersion
+    ]
+    inputs.properties(tokens)
+    filesMatching('plugin.yml') {
+        expand(tokens)
+    }
+}
+
+// A self-contained plugin JAR.
+//
+// Service registrations are merged so the JSON and HTTP factories keep
+// working, and no engine class is relocated.
+//
+// The duplicate strategy is INCLUDE so the service file transformer sees every
+// candidate file. The two plain files that Jackson and the Kotlin runtime
+// both ship are therefore excluded explicitly: a JAR with duplicate ZIP
+// entries is rejected by Paper's plugin remapper. Every notice that carries
+// licence obligations (META-INF/LICENSE.protobuf, META-INF/THIRD_PARTY_NOTICES.md,
+// META-INF/thirdparty-LICENSE, META-INF/FastDoubleParser-LICENSE) is kept.
+tasks.named('shadowJar') {
+    archiveBaseName = 'TikTokMinecraft'
+    archiveClassifier = ''
+    mergeServiceFiles()
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+    exclude 'META-INF/LICENSE', 'META-INF/NOTICE'
+    exclude 'META-INF/INDEX.LIST'
+    exclude 'module-info.class', 'META-INF/versions/**/module-info.class'
+    // Preserve multi-release entries when a dependency ships them.
+    manifest {
+        attributes('Multi-Release': 'true')
+    }
+}
+
+// The plain JAR is not shippable: it lacks the SDK.
+tasks.named('jar') {
+    archiveClassifier = 'thin'
+}
+
+// Inspects the shipped JAR the way the Paper server will see it.
+tasks.register('verifyPlugin', Exec) {
+    group = 'verification'
+    description = 'Verifies the plugin JAR: no duplicate entries, no bundled server classes, notices intact.'
+    dependsOn 'shadowJar'
+    commandLine 'python3', rootProject.file('scripts/verify-plugin.py').absolutePath,
+            tasks.named('shadowJar').get().archiveFile.get().asFile.absolutePath
+}
+
+// Prints the exact classpath a diagnostic program needs: the plugin's runtime
+// dependencies plus the GraalJS runtime that Paper loads separately.
+tasks.register('printRuntimeClasspath') {
+    group = 'help'
+    description = 'Prints the runtime classpath used by the plugin.'
+    doLast {
+        def files = configurations.runtimeClasspath.files + configurations.graalJsRuntime.files
+        println files.collect { it.absolutePath }.join(File.pathSeparator)
+    }
+}
+
+tasks.named('check') {
+    dependsOn 'verifyPlugin'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed'
+    }
+}
+
+tasks.named('assemble') {
+    dependsOn 'shadowJar'
+}

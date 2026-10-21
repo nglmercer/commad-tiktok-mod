@@ -1,0 +1,5 @@
+# Member (subscription) rules.
+#
+# 'member' fires when a viewer subscribes to the creator's membership.
+
+rules: []

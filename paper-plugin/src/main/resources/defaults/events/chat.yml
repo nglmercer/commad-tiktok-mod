@@ -1,0 +1,22 @@
+# Chat rules.
+#
+# A rule matches a normalized TikTok event and runs its actions. The trigger
+# 'chat' fires for every chat message. Matching is exact and typed; no
+# expression is ever evaluated.
+
+rules:
+  - id: chat-hello
+    enabled: true
+    trigger: chat
+
+    match:
+      text:
+        equals-ignore-case: "!hello"
+
+    cooldown:
+      duration: 10s
+      scope: user
+
+    actions:
+      - type: broadcast
+        message: "Hello from TikTok!"

@@ -1,0 +1,23 @@
+# Like rules.
+#
+# The aggregate block turns a stream of individual like events into a
+# threshold. The counter is based on the event delta ('count'), never on the
+# cumulative room total, so a rule cannot fire twice for the same likes.
+#
+# 'carry-remainder' keeps the remainder when the threshold is crossed, so
+# 125 likes with a threshold of 50 fire twice and keep 25 in reserve.
+
+rules:
+  - id: chicken-on-50-likes
+    enabled: false
+    trigger: like
+
+    aggregate:
+      metric: count
+      scope: global
+      threshold: 50
+      carry-remainder: true
+
+    actions:
+      - type: function
+        name: gifts:spawn_chicken

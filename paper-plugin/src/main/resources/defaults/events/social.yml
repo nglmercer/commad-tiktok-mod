@@ -1,0 +1,26 @@
+# Social rules.
+#
+# The SDK only confirms a follow (action 1) and a share (action 3). Anything
+# else is reported as 'social.other' or 'social.unknown' and is never folded
+# into a follow or a share, so these rules cannot fire on an unconfirmed
+# event.
+
+rules:
+  - id: follow-title
+    enabled: false
+    trigger: social.follow
+
+    actions:
+      - type: title
+        target: all-online
+        title: "New follower!"
+        subtitle: "Thank you for following!"
+
+  - id: share-sound
+    enabled: false
+    trigger: social.share
+
+    actions:
+      - type: sound
+        sound: minecraft:entity.player.levelup
+        target: all-online

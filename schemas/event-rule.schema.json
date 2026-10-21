@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nglmercer/commad-tiktok-mod/schemas/event-rule.schema.json",
+  "title": "TikTokMinecraft event rule file",
+  "description": "The rules section of a file in plugins/TikTokMinecraft/events/.",
+  "type": "object",
+  "required": ["rules"],
+  "properties": {
+    "rules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rule" }
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "required": ["id", "trigger", "actions"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+        },
+        "enabled": { "type": "boolean", "default": true },
+        "trigger": {
+          "type": "string",
+          "enum": [
+            "chat",
+            "chat.emote",
+            "gift",
+            "gift.final",
+            "like",
+            "member",
+            "social.follow",
+            "social.share",
+            "social.other",
+            "social.unknown",
+            "room.user",
+            "unknown"
+          ]
+        },
+        "priority": { "type": "integer", "minimum": -1000, "maximum": 1000 },
+        "stop-processing": { "type": "boolean", "default": false },
+        "match": {
+          "type": "object",
+          "additionalProperties": {
+            "oneOf": [
+              { "type": ["string", "number", "boolean"] },
+              { "type": "array" },
+              {
+                "type": "object",
+                "minProperties": 1,
+                "additionalProperties": {
+                  "type": ["string", "number", "boolean", "array"]
+                },
+                "propertyNames": {
+                  "enum": [
+                    "equals",
+                    "equals-ignore-case",
+                    "not-equal",
+                    "contains",
+                    "starts-with",
+                    "ends-with",
+                    "greater-than",
+                    "greater-or-equal",
+                    "less-than",
+                    "less-or-equal",
+                    "in"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "aggregate": {
+          "type": "object",
+          "required": ["metric", "scope", "threshold"],
+          "properties": {
+            "metric": { "type": "string", "enum": ["count", "total"] },
+            "scope": { "type": "string", "enum": ["event", "user", "global"] },
+            "threshold": { "type": "integer", "minimum": 1, "maximum": 1000000 },
+            "carry-remainder": { "type": "boolean", "default": false }
+          },
+          "additionalProperties": false
+        },
+        "cooldown": {
+          "type": "object",
+          "required": ["duration"],
+          "properties": {
+            "duration": { "type": "string" },
+            "scope": {
+              "type": "string",
+              "enum": ["rule", "user", "user-and-rule", "global"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "conditions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/condition" }
+        },
+        "actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/action" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "condition": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "all": { "type": "array", "items": { "$ref": "#/$defs/condition" } },
+        "any": { "type": "array", "items": { "$ref": "#/$defs/condition" } },
+        "not": { "$ref": "#/$defs/condition" },
+        "field": { "type": "string" },
+        "operator": { "type": "string" },
+        "value": { "type": ["string", "number", "boolean"] }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "broadcast",
+            "title",
+            "sound",
+            "particle",
+            "spawn-entity",
+            "give-item",
+            "effect",
+            "heal",
+            "teleport",
+            "function",
+            "command"
+          ]
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

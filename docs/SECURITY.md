@@ -1,83 +1,143 @@
 # Security
 
-HTTP commands can control the local player and, in singleplayer, create a
-command source with elevated permissions. Treat the API token as authority
-over that world. Ordinary commands typed in Minecraft chat are unaffected.
+A TikTok LIVE is an untrusted, public input source. A room can be flooded
+with messages in a second, and any viewer can type anything into the chat.
+The plugin is built so that a viewer can never become a Minecraft
+administrator.
 
-## Authentication and migration
+## The master switch
 
-Fresh configurations bind to `127.0.0.1`, use an ephemeral port, enable
-authentication, and generate a 256-bit SecureRandom bearer token. The token is
-saved in `config/commandapi.json`; it never appears in status, address discovery,
-protocol capabilities or audit logs. POSIX configuration files are owner-only
-(`0600`), including temporary files used for atomic writes.
+```yaml
+security:
+  execute-live-actions: false
+```
 
-An old configuration with no token is migrated to a generated token and
-`authEnabled: true`. A missing token field is generated on first launch.
-Explicit `authEnabled: true` with `token: ""` is rejected. Invalid configuration
-files stop startup rather than replacing restrictive policies with defaults.
-Read the generated token locally; update your caller to send
-`Authorization: Bearer <token>`. The bundled Node client can read both address
-and token from the chosen profile directory.
+While this is `false`, events are still received, shown and matched, but
+nothing an event triggers may change the world. It is the default on a fresh
+install. Turn it on only after the rules and the functions have been tested
+with `/tiktok test`.
 
-`authEnabled: false` only permits unauthenticated reads. **Every POST and DELETE
-still requires a valid configured token**, including chat and native execution.
-Clearing a token blocks these operations until a new token is configured.
+## Untrusted text
 
-## HTTP boundary
+These are all controlled by a viewer and are never treated as anything but
+text:
 
-Requests carrying an `Origin` header or `Sec-Fetch-Site: cross-site` are rejected,
-including requests from localhost browser applications. There is no CORS
-allowlist or unauthenticated browser integration. Mutation clients must send
-`Content-Type: application/json`; decoding requires valid UTF-8. Only exact
-known paths and methods are supported. Bodies are bounded at 64 KiB, batches at
-32 messages, and text at 256 UTF-16 code units. Worker and command queues are
-bounded; command capacity exhaustion returns 429.
+```text
+nickname
+uniqueId
+chat.text
+gift.name
+social metadata
+```
 
-Binding beyond loopback requires **both** authentication and an explicit
-`allowRemotePrivileged: true`. Changing `host` alone is rejected. HTTP is plain
-HTTP: use a trusted encrypted tunnel or TLS reverse proxy when transmitting
-credentials beyond the local machine.
+* Every message is built with the component API. A message containing
+  `<red>` is shown literally, because the component API does not parse
+  markup.
+* MiniMessage is never used, so a message can never inject a tag.
+* A message is never turned into a command. A chat message that starts with
+  `/` is still a chat message.
+* Text is never interpolated into command syntax. A function's parameters
+  are typed and validated, and a value that would break a command is
+  rejected.
+* Titles and JSON strings are serialized, never concatenated.
 
-## Command policies
+## The command allowlist
 
-`allowedCommands` selects exact command roots, including namespace prefixes.
-`[]` denies slash commands; `["time", "weather"]` permits those roots;
-`["*"]` explicitly permits every root. Namespaces are distinct: allowing `time`
-does not allow `minecraft:time`. Allowing delegation roots such as `execute`,
-`function` or plugin aliases delegates the authority reachable through them;
-this is a root allowlist, not a parser for arbitrary nested command languages.
-Chat remains on the normal connection path.
+A function may only run the command roots in `functions.allowed-commands`:
 
-`elevatedSingleplayer: true` applies elevation to the local command source only.
-Setting it to false preserves the player's normal native permissions. It never
-changes operator status or world settings. A remote server is never elevated
-by the client. Timed-out or unknown executions must not be automatically retried.
+```yaml
+functions:
+  allowed-commands:
+    - summon
+    - title
+    - playsound
+    - particle
+    - effect
+```
 
-## Server plugin
+The check runs twice: when the function is compiled, and again immediately
+before a command is dispatched. A command that is not on the list never
+runs.
 
-The independent administrator HTTP API is off by default. Enabling player HTTP
-mode requires a selected player UUID. Console HTTP mode additionally requires
-`sender: console` and `console-enabled: true`. Its separate bearer token remains
-in the administrator's plugin configuration and is never sent to clients.
+The `command` action needs both `security.allow-raw-commands` and
+`security.allow-console-commands`. Both are off by default.
 
-Plugin-message execution always uses the player supplied by the established
-server connection. It requires `commandapi.execute` (default false), the command
-root policy (default empty), and any configured UUID allowlist. Payload fields
-cannot select another player or request console execution. Dispatcher calls
-run on the Bukkit main thread, with native permissions, after command events;
-cancellation by another plugin prevents dispatch. Event rewrites are checked
-against the root policy again. The bridge does not disable third-party spam,
-permission or cancellation policies.
+## Entity spawning
 
-Messages have strict versioned decoding, size and time limits, correlated UUID
-request IDs, per-player ingress/command limits, a bounded replay cache covering
-the frame validity window, and cancellation on disconnect. Tokens are absent
-from the protocol. Audit logs contain only sender UUID and result code, never
-command text or credentials. Folia is unsupported.
+`actions.allowed-entities` is empty by default, which denies all spawning.
+Only the listed types may be spawned, and both a per-event and a per-minute
+cap apply:
 
-## Reporting
+```yaml
+actions:
+  max-entities-per-event: 5
+  max-entities-per-minute: 60
+```
 
-Report issues at https://github.com/nglmercer/commandclient/issues without tokens
-or unredacted configuration files. See [runtime evidence](RUNTIME_VERIFICATION.md)
-for the limits of the verification performed.
+An entity is never spawned into an unloaded chunk.
+
+## Bounds
+
+Every path into the world is bounded. Nothing waits without a limit.
+
+| Limit | Setting |
+|---|---|
+| Events waiting to be processed | `events.max-pending-events` |
+| Chat messages waiting to be shown | `chat.max-queue` |
+| Chat ingest rate | `chat.messages-per-second` |
+| Actions per event | `actions.max-actions-per-event` |
+| Entities per event | `actions.max-entities-per-event` |
+| Entities per minute | `actions.max-entities-per-minute` |
+| Functions running at once | `functions.max-concurrent` |
+| Functions waiting | `functions.max-queued` |
+| Commands per tick | `functions.max-commands-per-tick` |
+| Duration of a function run | `functions.max-execution-seconds` |
+| Repetitions of a step | `functions.max-repeat` |
+| Nesting depth | `functions.max-depth` |
+| Deduplication cache | derived from `events.deduplication-window-seconds` |
+| Cooldown keys | bounded, oldest entries are dropped |
+
+When a limit is reached the work is dropped and counted. `/tiktok status`
+reports the counters.
+
+## Deduplication
+
+A message that arrives twice is only processed once. The identifier is the
+room, the event type and the message id, plus the gift and group
+identifiers for a gift streak.
+
+A replayed message is therefore never a second world action.
+
+## Failure policy
+
+| Situation | What happens |
+|---|---|
+| TikTok is unreachable | The server keeps running. The plugin retries with a backoff. |
+| The creator is offline | The plugin checks again every minute and connects on its own. |
+| The signer cannot start | The LIVE connection fails. The rest of the server is unaffected. |
+| A rule file is broken | The previous rules stay active and the problem is reported. |
+| An action fails | The failure is logged and counted. The other actions still run. |
+| The queue is full | The event is dropped and counted. |
+| The target is offline | The action is skipped. |
+| The plugin is disabled | Every job is cancelled and the queues are cleared. |
+
+There is no unbounded retry loop anywhere.
+
+## The script format
+
+The DSL cannot evaluate an expression, call the host language, read a file,
+reach the network, import, reflect, loop without a bound, recurse, run a
+shell command or raise its own privileges. See [DSL.md](DSL.md).
+
+## The network
+
+The plugin talks to TikTok and to nothing else. It opens no listening port
+and accepts no connection. The signing bundle it downloads is verified
+against a pinned SHA-256 before it is used.
+
+## Reporting a problem
+
+Please include the server log from the start of the plugin's startup, the
+`config.yml` and the rule files. Never include cookies or credentials: the
+plugin does not log them, and if you added a session with cookies yourself,
+remove them from the report.

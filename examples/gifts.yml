@@ -1,0 +1,55 @@
+# Example gift rules.
+#
+# Copy this file into plugins/TikTokMinecraft/events/ to use it.
+#
+# 'gift' fires for every gift update, 'gift.final' fires once when a gift
+# streak is complete. Use 'gift.final' for streak gifts so an action runs
+# once per streak instead of once per repetition.
+#
+# The example matches a gift by name, which is convenient but not stable:
+# names are localized and can change. For production, match on the exact
+# gift id instead, for example:
+#
+#   match:
+#     gift-id: "5655"
+
+rules:
+  # A rose spawns a zombie next to the player who sent it.
+  - id: rose-zombie
+    enabled: false
+    trigger: gift.final
+
+    match:
+      gift-name: "Rose"
+
+    cooldown:
+      duration: 2s
+      scope: user
+
+    actions:
+      - type: function
+        name: gifts:spawn_zombies
+        args:
+          count: 1
+
+  # An expensive gift shows everyone a title.
+  - id: big-gift-title
+    enabled: false
+    trigger: gift.final
+
+    match:
+      diamonds:
+        greater-or-equal: 1000
+
+    cooldown:
+      duration: 10s
+      scope: rule
+
+    actions:
+      - type: title
+        target: all-online
+        title: "A big gift!"
+        subtitle: "Somebody sent a very generous gift"
+      - type: sound
+        sound: minecraft:entity.player.levelup
+        target: all-online

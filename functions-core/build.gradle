@@ -1,0 +1,37 @@
+// The reusable function engine. It knows nothing about Paper, Bukkit or
+// TikTok: it parses function definitions, compiles them into bounded plans
+// and executes those plans through a MinecraftBridge.
+//
+// Gson is compile-only here because the Paper server provides it at runtime;
+// the paper-plugin module relies on that same runtime dependency.
+
+plugins {
+    id 'java-library'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    compileOnly 'com.google.code.gson:gson:2.11.0'
+
+    testImplementation 'com.google.code.gson:gson:2.11.0'
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    testLogging {
+        events 'failed'
+    }
+}
