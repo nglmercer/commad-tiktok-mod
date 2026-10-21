@@ -32,7 +32,10 @@ public final class ActionRegistry {
         register(new FunctionAction());
         register(new CommandAction());
         register(new PrimeTntAction());
-        register(new TntCageAction());
+        TntCageAction cage = new TntCageAction();
+        register(cage);
+        // Both action types MUST share one owner of placed blocks.
+        actions.put("block-cage", cage);
         register(new VoidShaftAction());
         register(new LightningAction());
         register(new PlaceCobwebAction());
