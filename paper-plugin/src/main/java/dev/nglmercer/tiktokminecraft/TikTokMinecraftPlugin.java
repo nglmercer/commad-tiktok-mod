@@ -266,12 +266,41 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
         boolean connectionChanged = previous == null
                 || !previous.uniqueId().equals(updated.uniqueId())
                 || previous.fetchGifts() != updated.fetchGifts();
-        if (connectionChanged && liveService.state().isActive()) {
+        if (connectionChanged) {
             getLogger().info("Connection settings changed; reconnecting.");
             liveService.reconnect();
         }
         getLogger().info("Configuration reloaded.");
         return problems;
+    }
+
+    /**
+     * Switches to another creator and reconnects.
+     *
+     * <p>The change is written to {@code config.yml}, so it survives a
+     * restart, and it takes effect immediately: the plugin does not have to
+     * be restarted and the file does not have to be edited by hand.</p>
+     *
+     * @return null when the creator was changed, or the reason it was not
+     */
+    public String applyCreator(String uniqueId) {
+        if (uniqueId == null || !uniqueId.matches("[A-Za-z0-9._]{1,24}")) {
+            return "That is not a valid TikTok username";
+        }
+        if (liveService == null) {
+            return "The plugin is not running";
+        }
+        getConfig().set("tiktok.unique-id", uniqueId);
+        PluginConfig.Result result = PluginConfig.load(getConfig());
+        if (!result.isValid()) {
+            saveConfig();
+            return result.problems().get(0);
+        }
+        config = result.config();
+        liveService.applyConfig(config);
+        liveService.reconnect();
+        saveConfig();
+        return null;
     }
 
     /** Loads the functions. A broken file keeps the previous set active. */

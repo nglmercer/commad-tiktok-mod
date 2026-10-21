@@ -11,6 +11,7 @@ import io.github.nglmercer.tiktoklive.TikTokLive;
 import java.nio.file.Path;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -59,6 +60,7 @@ public final class TikTokLiveService implements AutoCloseable {
     private volatile String roomId = "";
     private volatile boolean stopped;
     private volatile boolean manualDisconnect;
+    private volatile ScheduledFuture<?> pendingRetry;
 
     public TikTokLiveService(
             PluginLog log, Path cacheDirectory, Listener listener, PluginConfig config) {
@@ -106,12 +108,17 @@ public final class TikTokLiveService implements AutoCloseable {
         if (stopped) {
             return;
         }
+        if (state == LiveConnectionState.CONNECTED) {
+            log.debug(LogCategory.CONNECTION, "Already connected; ignoring request");
+            return;
+        }
         if (!connecting.compareAndSet(false, true)) {
             log.debug(LogCategory.CONNECTION, "Connection already in progress; ignoring request");
             return;
         }
         manualDisconnect = false;
         reconnectAttempts.set(0);
+        cancelPendingRetry();
         try {
             EmbeddedJavaConnectionProvider newProvider =
                     EmbeddedJavaConnectionProvider.builder()
@@ -313,17 +320,42 @@ public final class TikTokLiveService implements AutoCloseable {
 
     private void schedule(long delaySeconds) {
         try {
-            timers.schedule(
-                    () -> {
-                        if (stopped || manualDisconnect) {
-                            return;
-                        }
-                        connect();
-                    },
-                    delaySeconds,
-                    TimeUnit.SECONDS);
+            synchronized (this) {
+                if (pendingRetry != null) {
+                    pendingRetry.cancel(false);
+                    pendingRetry = null;
+                }
+                pendingRetry =
+                        timers.schedule(
+                                () -> {
+                                    pendingRetry = null;
+                                    if (stopped || manualDisconnect) {
+                                        return;
+                                    }
+                                    connect();
+                                },
+                                delaySeconds,
+                                TimeUnit.SECONDS);
+            }
         } catch (RuntimeException ignored) {
             // The scheduler is shutting down; the connection stays down.
+        }
+    }
+
+    /**
+     * Cancels a scheduled retry.
+     *
+     * <p>Without this a retry that was scheduled before a manual reconnect
+     * would fire afterwards and open a second connection, which would leave
+     * the first client's listeners registered and deliver every event
+     * twice.</p>
+     */
+    private void cancelPendingRetry() {
+        synchronized (this) {
+            if (pendingRetry != null) {
+                pendingRetry.cancel(false);
+                pendingRetry = null;
+            }
         }
     }
 

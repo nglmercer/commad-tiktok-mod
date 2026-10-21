@@ -23,6 +23,22 @@ tiktok:
 | `fetch-gifts` | Download the gift catalog so a gift can be matched by its exact id. |
 | `ignore-history` | Ignore the room's history replay. |
 
+## Changing the creator while the server runs
+
+```text
+/tiktok creator
+/tiktok creator <username>
+```
+
+The first form shows the current creator. The second switches to another
+one, writes it to `config.yml` and reconnects at once. The plugin does not
+have to be stopped and started again, and the file does not have to be
+edited by hand.
+
+Changing `unique-id` in the file and running `/tiktok reload` does the same
+thing, and a reload that changes a connection relevant setting always
+reconnects, even when the previous creator was offline.
+
 ## chat
 
 ```yaml

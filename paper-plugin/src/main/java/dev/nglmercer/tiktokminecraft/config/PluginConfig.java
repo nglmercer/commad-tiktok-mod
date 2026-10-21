@@ -108,16 +108,26 @@ public final class PluginConfig {
     private final boolean logConnection;
     private final boolean logRuleMatches;
 
+    /**
+     * Normalizes a TikTok username.
+     *
+     * <p>The leading {@code @} is optional and is not part of the
+     * identifier.</p>
+     */
+    public static String normalizeUniqueId(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String text = raw.trim();
+        if (text.startsWith("@")) {
+            text = text.substring(1);
+        }
+        return text;
+    }
+
     private PluginConfig(FileConfiguration config) {
         ConfigurationSection tiktok = config.getConfigurationSection("tiktok");
-        String id = tiktok == null ? "" : tiktok.getString("unique-id", "");
-        id = id == null ? "" : id.trim();
-        // The leading @ is optional in the configuration and is not part of
-        // the identifier, so it is stripped once here.
-        if (id.startsWith("@")) {
-            id = id.substring(1);
-        }
-        this.uniqueId = id;
+        this.uniqueId = normalizeUniqueId(tiktok == null ? "" : tiktok.getString("unique-id", ""));
         this.autoConnect = tiktok == null || tiktok.getBoolean("auto-connect", true);
         this.reconnect = tiktok == null || tiktok.getBoolean("reconnect", true);
         this.fetchGifts = tiktok == null || tiktok.getBoolean("fetch-gifts", true);

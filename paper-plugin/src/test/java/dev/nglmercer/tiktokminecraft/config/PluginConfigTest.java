@@ -46,6 +46,16 @@ class PluginConfigTest {
         assertEquals("elpadredomingooficial", result.config().uniqueId());
     }
 
+    @Test void aCreatorIsNormalizedTheSameWayEverywhere() {
+        // The command and the configuration file must agree on what a
+        // username looks like, so the same creator is never stored twice.
+        assertEquals("creator", PluginConfig.normalizeUniqueId("@creator"));
+        assertEquals("creator", PluginConfig.normalizeUniqueId("creator"));
+        assertEquals("creator", PluginConfig.normalizeUniqueId("  @creator  "));
+        assertEquals("", PluginConfig.normalizeUniqueId(null));
+        assertEquals("", PluginConfig.normalizeUniqueId("@"));
+    }
+
     @Test void emptyCreatorIsRejected() {
         PluginConfig.Result result = PluginConfig.load(config("tiktok:", "  unique-id: \"\""));
         assertFalse(result.isValid());

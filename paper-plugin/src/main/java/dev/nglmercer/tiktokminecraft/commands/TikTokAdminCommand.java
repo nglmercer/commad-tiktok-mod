@@ -37,7 +37,7 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
     private static final List<String> SUBCOMMANDS = Collections.unmodifiableList(
             Arrays.asList(
                     "help", "status", "connect", "disconnect", "reconnect", "reload",
-                    "chat", "rules", "functions", "jobs", "test", "debug"));
+                    "chat", "creator", "rules", "functions", "jobs", "test", "debug"));
 
     private final TikTokMinecraftPlugin plugin;
     private final Instant startedAt = Instant.now();
@@ -101,6 +101,9 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
             case "chat":
                 chat(sender, args);
                 return true;
+            case "creator":
+                creator(sender, args);
+                return true;
             case "rules":
                 rules(sender, args);
                 return true;
@@ -131,6 +134,7 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("  /" + label + " reconnect - reconnect immediately");
         sender.sendMessage("  /" + label + " reload - reload the configuration, rules and functions");
         sender.sendMessage("  /" + label + " chat on|off - toggle the Minecraft chat mirror");
+        sender.sendMessage("  /" + label + " creator [name] - show or change the creator");
         sender.sendMessage("  /" + label + " rules list|enable <id>|disable <id> - manage the rules");
         sender.sendMessage("  /" + label + " functions list|preview <id>|run <id> - manage the functions");
         sender.sendMessage("  /" + label + " jobs list|cancel <id> - manage the running functions");
@@ -382,6 +386,33 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("Usage: /tiktok jobs list|cancel <id>");
     }
 
+    /**
+     * Shows or changes the creator.
+     *
+     * <p>The change is written to the configuration and the connection is
+     * restarted at once, so the plugin does not have to be stopped and
+     * started again.</p>
+     */
+    private void creator(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("The current creator is @" + plugin.config().uniqueId() + ".");
+            sender.sendMessage("Usage: /tiktok creator <username>");
+            return;
+        }
+        String name = dev.nglmercer.tiktokminecraft.config.PluginConfig
+                .normalizeUniqueId(args[1]);
+        if (name.equalsIgnoreCase(plugin.config().uniqueId())) {
+            sender.sendMessage("The creator is already @" + name + ".");
+            return;
+        }
+        String problem = plugin.applyCreator(name);
+        if (problem != null) {
+            sender.sendMessage("The creator was not changed: " + problem);
+            return;
+        }
+        sender.sendMessage("The creator is now @" + name + ". Reconnecting.");
+    }
+
     private void debug(CommandSender sender, String[] args) {
         if (args.length < 2) {
             sender.sendMessage("Usage: /tiktok debug on|off");
@@ -525,6 +556,10 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
             }
             if (sub.equals("rules")) {
                 return filter(Arrays.asList("list", "enable", "disable"), args[1]);
+            }
+            if (sub.equals("creator")) {
+                return filter(
+                        Collections.singletonList(plugin.config().uniqueId()), args[1]);
             }
             if (sub.equals("functions")) {
                 return filter(Arrays.asList("list", "preview", "run"), args[1]);

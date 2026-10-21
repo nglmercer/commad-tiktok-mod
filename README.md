@@ -91,12 +91,17 @@ Viewer text is never interpreted as markup and never turned into a command.
 /tiktok reconnect
 /tiktok reload
 /tiktok chat on|off
+/tiktok creator [username]
 /tiktok rules list|enable <id>|disable <id>
 /tiktok functions list|preview <id>|run <id>
 /tiktok jobs list|cancel <id>
 /tiktok test chat|gift|like|follow|share
 /tiktok debug on|off
 ```
+
+`/tiktok creator <username>` switches to another creator, writes it to
+`config.yml` and reconnects at once — no restart, no editing the file by
+hand.
 
 `/tiktok test` injects a synthetic event into the normal pipeline. It never
 contacts TikTok, so you can develop and test without going live.
