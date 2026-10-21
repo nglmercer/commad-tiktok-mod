@@ -22,8 +22,10 @@ After updating the JAR, run from the console or as a server operator:
 validates/reloads rules, and restores the old rules if validation fails.
 
 Your existing `config.yml` does not automatically acquire new defaults. The command
-also enables `security.execute-live-actions` and `events.enabled`. Raw console
-command permissions are **not** required by the two new native Paper actions.
+also enables `security.execute-live-actions` and `events.enabled`, allows
+the configured entity types, and raises older per-event/per-minute entity budgets
+to at least 64 / 240. These changes are an **explicit operator opt-in**.
+Raw console command permissions are **not** required by the two new native Paper actions.
 
 ## The 12 panel interactions
 
