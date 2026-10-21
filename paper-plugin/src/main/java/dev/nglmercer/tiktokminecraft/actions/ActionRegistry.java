@@ -32,6 +32,8 @@ public final class ActionRegistry {
         register(new FunctionAction());
         register(new CommandAction());
         register(new PrimeTntAction());
+        register(new TntCageAction());
+        register(new VoidShaftAction());
         register(new LightningAction());
         register(new PlaceCobwebAction());
         register(new RemoveItemAction());
