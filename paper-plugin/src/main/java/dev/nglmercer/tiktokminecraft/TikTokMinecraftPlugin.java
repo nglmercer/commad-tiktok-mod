@@ -146,6 +146,10 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
                     actionRegistry.get("temporary-clear-inventory")).restoreAll();
             ((dev.nglmercer.tiktokminecraft.actions.PlaceCobwebAction)
                     actionRegistry.get("place-cobweb")).restoreAll();
+            ((dev.nglmercer.tiktokminecraft.actions.TntCageAction)
+                    actionRegistry.get("tnt-cage")).restoreAll();
+            ((dev.nglmercer.tiktokminecraft.actions.VoidShaftAction)
+                    actionRegistry.get("void-shaft")).restoreAll();
         }
         if (tickTask != null) {
             tickTask.cancel();
