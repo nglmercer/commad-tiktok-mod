@@ -1,4 +1,137 @@
-# TikTok Minecraft meme preset
+# Complete TikTok LIVE → Minecraft meme preset
 
-The default interactions are defined in `paper-plugin/src/main/resources/defaults/events/interactions.yml`.
-Use `/tiktok reload` after editing the deployed rules.
+This project ships a 12-interaction Minecraft meme panel, plus a native TNT cage for expensive gifts.
+The preset is in `paper-plugin/src/main/resources/defaults/events/interactions.yml`.
+All rules are enabled in the new default. **Use this on a disposable Minecraft world**.
+
+## Install / upgrade
+
+On a fresh server, `interactions.yml` is copied into `plugins/TikTokMinecraft/events/` on startup.
+
+On an existing server, the plugin **never silently overwrites** your rules.
+After updating the JAR, run from the console or as a server operator:
+
+```text
+/tiktok preset install
+/tiktok rules list
+/tiktok status
+```
+
+`/tiktok preset install` backs up the existing `interactions.yml` to
+`interactions.yml.bak-<timestamp>`, writes the shipped preset, enables live actions,
+validates/reloads rules, and restores the old rules if validation fails.
+
+Your existing `config.yml` does not automatically acquire new defaults. The command
+also enables `security.execute-live-actions` and `events.enabled`. Raw console
+command permissions are **not** required by the two new native Paper actions.
+
+## The 12 panel interactions
+
+| TikTok gift/event | Rule | Minecraft outcome |
+|---|---|---|
+| 150 likes | `meme-likes-zombie` | Spawn 1 zombie per threshold |
+| Rose (5655) | `meme-rose-tnt` | 2 primed TNT per rose |
+| Confetti (5585) | `meme-confetti-tnt` | Request 30,000 TNT, bounded by server entity budgets |
+| Rosa (8913) | `meme-rosa-charged-creeper` | Spawn a charged creeper |
+| Finger Heart (5487) | `meme-finger-heart-webs` | Place 6 temporary cobwebs |
+| Share event | `meme-share-apples` | Give 3 enchanted golden apples |
+| Cap (6104) | `meme-cap-wardens` | Spawn 10 wardens |
+| Corgi (6267) | `meme-corgi-inventory` | Temporarily hide and restore inventory |
+| Capybara (14488) | `meme-capybara-evokers` | Spawn 15 evokers |
+| Doughnut (5879) | `meme-doughnut-void` | Open a temporary shaft through blocks and bedrock to world void |
+| Fireworks (6090) | `meme-fireworks-skeletons` | Spawn 10 wither skeletons |
+| Money Gun (7168) | `meme-money-gun-withers` | Request 500 Withers, capped to 3 per activation |
+
+### Bonus: TNT cage on expensive gifts
+
+`meme-high-value-tnt-cage` listens for a gift worth **100+ diamonds per unit**.
+It uses the new `tnt-cage` action, not console commands or `/fill`.
+By default, it creates a 5×5×5 hollow TNT shell centered on the target
+and ignites one block after 40 ticks. The remaining intact TNT blocks are
+restored after 25 seconds. Exploded blocks and collateral terrain are not
+automatically rolled back.
+
+Example:
+
+```yaml
+- id: donation-tnt-cage
+  enabled: true
+  trigger: gift.final
+  match:
+    diamonds:
+      greater-or-equal: 100
+  actions:
+    - type: tnt-cage
+      radius: 2
+      height: 3
+      ignite: true
+      ignite-delay-ticks: 40
+      fuse-ticks: 80
+      restore-seconds: 25
+      target: nearest-online
+```
+
+### Native `void-shaft` action
+
+`void-shaft` removes blocks in a 3×3 shaft directly beneath the chosen player
+from the player's feet down to `World#getMinHeight()`, **including bedrock**.
+It clears from bottom to top in bounded per-tick batches, then centers the
+player over the completed shaft. The hole is restored after a delay, as long
+as its chunks remain loaded and nobody has replaced its blocks.
+The action will not overwrite container blocks or unloaded chunks; it skips
+a shaft requiring more than `max-blocks`.
+
+Example:
+
+```yaml
+- id: doughnut-to-void
+  enabled: true
+  trigger: gift.final
+  match:
+    gift-id: '5879'
+  actions:
+    - type: void-shaft
+      radius: 1
+      max-blocks: 4096
+      blocks-per-tick: 96
+      restore-seconds: 30
+      target: nearest-online
+```
+
+**Not a complete anti-grief or region protection system:** native world changes
+do not consult third-party claim plugins. Do not use these actions in valuable
+survival worlds, where even a temporary void pit or TNT explosion can cause
+irreversible deaths, item loss, and terrain damage.
+
+## Synthetic testing
+
+Use a backup or disposable test world with at least one player connected.
+
+```text
+/tiktok test like 150
+/tiktok test gift Rose 1
+/tiktok test gift Confetti 1
+/tiktok test gift Rosa 1
+/tiktok test gift Capybara 1
+/tiktok test gift Doughnut 1
+/tiktok test gift MoneyGun 1
+/tiktok status
+```
+
+`/tiktok test gift` uses local synthetic gift metadata. It never sends a gift
+or uses TikTok coins. The real donation cage depends on the SDK's gift
+catalog for the correct `gift.diamonds` value.
+
+## Notes
+
+- Gift `xN` is the number of Minecraft effects/items **per gift**.
+- Nonstreak gifts and finished streak gifts are consumed as `gift.final`.
+- Repeated gifts multiply effect counts where the rule specifies `multiply-by-repeat`.
+- `prime-tnt` requests are intentionally capped at 128 and also obey
+  `actions.max-entities-per-event` / per-minute budgets.
+- Money Gun requests 500 Withers but deliberately spawns at most 3 per event.
+- Event commands are only available to operators (admin permission);
+  ordinary TikTok viewers cannot run server commands.
+- `void-shaft` and `tnt-cage` restore their own unchanged blocks on
+  scheduled cleanup and plugin disable, but cannot guarantee restoration
+  across server crashes, unloaded chunks, or explosion-caused terrain changes.
