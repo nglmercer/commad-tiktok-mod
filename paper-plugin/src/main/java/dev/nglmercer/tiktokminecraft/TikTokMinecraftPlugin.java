@@ -272,6 +272,11 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
             }
             return problems;
         }
+        // Refresh the entity budget on config reload, so /tiktok preset install
+        // immediately enables the preset even on servers using older limits.
+        if (previous == null || previous.maxEntitiesPerMinute() != updated.maxEntitiesPerMinute()) {
+            entityLimiter = new EntityRateLimiter(updated.maxEntitiesPerMinute());
+        }
         config = updated;
         eventBus.applyConfig(updated);
         chatBridge.applyConfig(updated);
