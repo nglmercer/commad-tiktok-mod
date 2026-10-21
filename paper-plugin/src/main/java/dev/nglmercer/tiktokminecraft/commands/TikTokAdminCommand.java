@@ -580,9 +580,13 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
 
     private static Map<String, Object> giftPayload(String name, long repeats) {
         Map<String, Object> payload = new LinkedHashMap<String, Object>();
-        payload.put("gift.id", giftIdForTest(name));
+        String giftId = giftIdForTest(name);
+        payload.put("gift.id", giftId);
         payload.put("gift.name", name);
-        payload.put("gift.diamonds", Long.valueOf(1));
+        // The fixed known-gift prices mirror the documented catalog. Without
+        // this the test for an expensive donation would never match a
+        // "diamonds >= 100" rule because every synthetic gift cost 1.
+        payload.put("gift.diamonds", Long.valueOf(testDiamondPrice(giftId)));
         payload.put("gift.repeatCount", Long.valueOf(repeats));
         payload.put("gift.comboCount", Long.valueOf(repeats));
         payload.put("gift.groupId", "0");
@@ -606,6 +610,22 @@ public final class TikTokAdminCommand implements CommandExecutor, TabCompleter {
             case "fireworks": return "6090";
             case "moneygun": return "7168";
             default: return name.matches("[0-9]+") ? name : "0";
+        }
+    }
+
+    private static long testDiamondPrice(String giftId) {
+        switch (giftId) {
+            case "5655": return 1;     // Rose
+            case "5585": return 100;   // Confetti
+            case "8913": return 10;    // Rosa
+            case "5487": return 5;     // Finger Heart
+            case "6104": return 99;    // Cap
+            case "6267": return 299;   // Corgi
+            case "14488": return 30;   // Capybara
+            case "5879": return 30;    // Doughnut
+            case "6090": return 1088;  // Fireworks
+            case "7168": return 500;   // Money Gun
+            default: return 1;
         }
     }
 
