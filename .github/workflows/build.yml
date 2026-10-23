@@ -1,9 +1,8 @@
 name: Build
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
+  # CI minutes are unavailable while GitHub Actions billing is blocked.
+  # Use scripts/build-local.sh; the workflow can still be run manually later.
   workflow_dispatch:
 
 permissions:
@@ -12,13 +11,23 @@ permissions:
 env:
   JAVA_VERSION: '21'
   PAPER_VERSION: '1.21.11'
+  # Pinned to a reviewed SDK commit so the JAR is reproducible even if
+  # tiktok-signer/main changes before the next build.
+  TIKTOK_SDK_REF: '82e25287f30851f53003da2daf63b0b69563199a'
 
 jobs:
   build:
-    name: Build and unit tests
+    name: Paper 1.21.11 - compile, test, package
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: nglmercer/tiktok-signer
+          ref: ${{ env.TIKTOK_SDK_REF }}
+          path: _deps/tiktok-signer
+          persist-credentials: false
 
       - uses: actions/setup-java@v4
         with:
@@ -26,52 +35,52 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
-      - name: Compile and test
-        run: ./gradlew clean build --stacktrace
+      # The Java SDK is not published to Maven Central. Install the exact
+      # sources first, otherwise the plugin cannot resolve its dependencies.
+      - name: Publish pinned TikTok Java SDK to Maven Local
+        working-directory: _deps/tiktok-signer/sdk/java
+        run: ./gradlew publishToMavenLocal --stacktrace
 
-      - name: Resolve the GraalJS runtime
-        run: ./gradlew :paper-plugin:verifyGraalJs
+      - name: Compile, test and validate plugin dependencies
+        run: ./gradlew clean build :paper-plugin:verifyGraalJs --stacktrace
 
-      - name: Upload the plugin
+      - name: Upload installable plugin JAR
         uses: actions/upload-artifact@v4
         with:
-          name: TikTokMinecraft
-          path: paper-plugin/build/libs/TikTokMinecraft-*.jar
+          name: TikTokMinecraft-1.21.11
+          # Never upload the thin JAR (which omits the TikTok SDK).
+          path: paper-plugin/build/libs/TikTokMinecraft-0.1.0.jar
           if-no-files-found: error
+          retention-days: 30
 
   plugin-jar:
-    name: Inspect the plugin JAR
+    name: Inspect distributable JAR
     runs-on: ubuntu-latest
     needs: build
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/download-artifact@v4
         with:
-          distribution: temurin
-          java-version: ${{ env.JAVA_VERSION }}
-          cache: gradle
-
-      - name: Build
-        run: ./gradlew :paper-plugin:assemble
+          name: TikTokMinecraft-1.21.11
+          path: paper-plugin/build/libs
 
       - name: Verify the JAR
         run: python3 scripts/verify-plugin.py paper-plugin/build/libs/TikTokMinecraft-0.1.0.jar
 
-      - name: Check the third-party notices
+      - name: Check third-party notices
         run: |
           set -e
           jar=paper-plugin/build/libs/TikTokMinecraft-0.1.0.jar
           for notice in META-INF/LICENSE.protobuf META-INF/THIRD_PARTY_NOTICES.md THIRD-PARTY-NOTICES.md; do
-            if ! unzip -l "$jar" | grep -q "$notice"; then
+            if ! unzip -Z1 "$jar" | grep -Fxq "$notice"; then
               echo "The plugin JAR is missing $notice"
               exit 1
             fi
           done
-          echo "Every licence notice survived packaging."
 
   schemas:
-    name: Check the examples against the schemas
+    name: Check examples against schemas
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -80,14 +89,14 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install the schema tools
+      - name: Install schema tools
         run: pip install --quiet jsonschema pyyaml
 
-      - name: Check the examples
+      - name: Check examples
         run: python3 scripts/check-schemas.py
 
   paper-smoke:
-    name: Paper runtime smoke test
+    name: Paper 1.21.11 runtime smoke test
     runs-on: ubuntu-latest
     needs: build
     steps:
@@ -97,28 +106,30 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
-          cache: gradle
 
-      - name: Build the plugin
-        run: ./gradlew :paper-plugin:assemble
+      - name: Download compiled plugin JAR
+        uses: actions/download-artifact@v4
+        with:
+          name: TikTokMinecraft-1.21.11
+          path: test-server/plugins
 
-      - name: Download Paper
+      - name: Download Paper 1.21.11
         run: |
           set -e
-          mkdir -p test-server/plugins
+          mkdir -p test-server
           build=$(curl -fsSL -H 'User-Agent: tiktokminecraft-ci' \
             "https://fill.papermc.io/v3/projects/paper/versions/${{ env.PAPER_VERSION }}/builds" \
             | python3 -c "import json,sys; builds=json.load(sys.stdin); print([b for b in builds if b['channel']=='STABLE'][0]['downloads']['server:default']['url'])")
           curl -fsSL -o test-server/paper.jar "$build"
           echo "eula=true" > test-server/eula.txt
-          cp paper-plugin/build/libs/TikTokMinecraft-*.jar test-server/plugins/
 
-      - name: Start the server and check the plugin
+      - name: Start Paper and check the plugin
         run: |
           set -e
           cd test-server
           java -jar paper.jar --nogui > console.log 2>&1 &
           server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
           for _ in $(seq 1 90); do
             if grep -q 'Done (' console.log 2>/dev/null; then break; fi
             if ! kill -0 "$server" 2>/dev/null; then
@@ -129,26 +140,18 @@ jobs:
             sleep 2
           done
           sleep 5
-          echo "--- plugin lines ---"
           grep 'TikTokMinecraft' console.log || true
           if ! grep -q 'Enabling TikTokMinecraft' console.log; then
-            echo "The plugin did not enable:"
             cat console.log
-            kill "$server" || true
             exit 1
           fi
           if grep -qE 'NoClassDefFoundError|ClassNotFoundException|ServiceConfigurationError' console.log; then
-            echo "A dependency failed to load:"
-            grep -E 'NoClassDefFoundError|ClassNotFoundException|ServiceConfigurationError' console.log
-            kill "$server" || true
+            cat console.log
             exit 1
           fi
-          echo "The plugin enabled and every dependency resolved."
-          kill "$server" || true
-          wait "$server" 2>/dev/null || true
-          cat console.log
+          echo "The plugin enabled and its dependencies resolved."
 
-      - name: Upload the server log
+      - name: Upload server log
         if: always()
         uses: actions/upload-artifact@v4
         with:

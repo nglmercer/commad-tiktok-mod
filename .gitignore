@@ -42,3 +42,7 @@ release-notes.md
 
 # Local Paper test servers
 test-server/
+
+# Local SDK checkout and installable artifacts (no CI required)
+.build-deps/
+dist/

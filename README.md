@@ -263,6 +263,11 @@ limit.
 
 The build produces `paper-plugin/build/libs/TikTokMinecraft-<version>.jar`.
 
+**If GitHub Actions is blocked by billing:** run `bash scripts/build-local.sh`
+on a Linux machine with JDK 21. It publishes the pinned TikTok Java SDK locally,
+compiles and checks the plugin, and exports `dist/TikTokMinecraft-1.21.11.jar`.
+See [Building without CI](docs/BUILD-WITHOUT-CI.md).
+
 ### Dependencies
 
 | Dependency | Why | How it is delivered |
