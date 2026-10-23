@@ -1,0 +1,15 @@
+# Replaces the cosmetic Finger Heart rule from the partial photo configuration.
+# Disable/remove other rules for gift 5487 if this should be its only action.
+rules:
+  - id: finger-heart-damaging-lightning
+    enabled: true
+    trigger: gift.final
+    match:
+      gift-id: '5487'
+    actions:
+      - type: lightning
+        damage: true
+        duration-seconds: 300
+        interval-ticks: 40
+        count: 1
+        target: nearest-online
