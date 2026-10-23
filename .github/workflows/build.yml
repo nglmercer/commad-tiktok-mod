@@ -1,9 +1,8 @@
 name: Build
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
+  # CI minutes are unavailable while GitHub Actions billing is blocked.
+  # Use scripts/build-local.sh; the workflow can still be run manually later.
   workflow_dispatch:
 
 permissions:
