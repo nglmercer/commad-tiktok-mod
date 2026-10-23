@@ -164,6 +164,10 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
             fileWatcher = null;
         }
         if (actionRegistry != null) {
+            ((dev.nglmercer.tiktokminecraft.actions.LightningAction)
+                    actionRegistry.get("lightning")).cancelAll();
+            ((dev.nglmercer.tiktokminecraft.actions.LightningAction)
+                    actionRegistry.get("lightning-effect")).cancelAll();
             ((dev.nglmercer.tiktokminecraft.actions.ClearInventoryAction)
                     actionRegistry.get("temporary-clear-inventory")).restoreAll();
             ((dev.nglmercer.tiktokminecraft.actions.PlaceCobwebAction)
@@ -323,6 +327,12 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
             entityLimiter = new EntityRateLimiter(updated.maxEntitiesPerMinute());
         }
         config = updated;
+        // A successful reload stops scheduled lightning, including when live
+        // actions are disabled or the entity budget/target configuration changes.
+        ((dev.nglmercer.tiktokminecraft.actions.LightningAction)
+                actionRegistry.get("lightning")).cancelAll();
+        ((dev.nglmercer.tiktokminecraft.actions.LightningAction)
+                actionRegistry.get("lightning-effect")).cancelAll();
         // Do not reset event deduplication merely because an administrator
         // edited an action, function or DSL rule while connected to LIVE.
         if (previous == null || previous.maxPendingEvents() != updated.maxPendingEvents()

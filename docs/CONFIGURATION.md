@@ -251,3 +251,34 @@ player actions have no target rather than selecting another streamer. Clearing
 an assignment restores the shared target policy. Target edits do not reconnect
 the account. Connection options and event/action limits are shared across all
 accounts. Chat continues to mirror through the shared chat bridge.
+
+## Damaging lightning storms
+
+`lightning` uses real vanilla lightning at the target's current location. It can
+cause damage, fire and vanilla mob transformations; game rules, protection
+plugins, game modes and invulnerability still apply. Existing `lightning-effect`
+rules remain cosmetic and one-shot unless configured otherwise. Either name
+accepts an explicit boolean `damage`.
+
+See `examples/finger-heart-lightning.yml`: one completed Finger Heart streak
+starts a five-minute storm with one strike every 40 ticks (two seconds at 20 TPS).
+Replace the previous cosmetic rule; keeping both enabled executes both actions.
+The gift ID is reused from the repository's existing Finger Heart preset.
+
+- `duration-seconds`: 0..3600; 0 is a single burst. Defaults: 60 for
+  `lightning`, 0 for `lightning-effect`.
+- `interval-ticks`: 10..1200, default 20. `count`: 1..32 strikes per burst.
+- Storms follow the initially selected player's UUID, including respawn in a
+  different world. Dead/offline players are skipped, without cancelling the
+  storm. Its lifetime keeps counting in server ticks while dead/offline; it
+  resumes only if time remains. It does not persist through a server restart.
+- Another storm for the same player refreshes duration/settings without stacking
+  tasks or an immediate extra hit. A reload or plugin disable cancels storms.
+- At most 128 active targets and 32 scheduled strikes per tick per action name;
+  strikes also consume the shared per-minute entity budget, so heavy traffic may
+  suppress bursts. No chunks are force-loaded. Only the first resolved player is
+  targeted, matching the legacy lightning action.
+
+Manual server check: run the example, die, respawn at a different location, and
+verify subsequent damaging strikes use the respawn location. Verify expiry,
+refresh without stacking, disconnect/rejoin before expiry, and reload cancellation.
