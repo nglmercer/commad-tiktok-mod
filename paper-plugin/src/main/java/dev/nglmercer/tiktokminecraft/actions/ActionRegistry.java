@@ -38,6 +38,7 @@ public final class ActionRegistry {
         actions.put("block-cage", cage);
         register(new VoidShaftAction());
         register(new LightningAction());
+        register(new LightningAction("lightning", true));
         register(new PlaceCobwebAction());
         register(new RemoveItemAction());
         register(new ClearInventoryAction());

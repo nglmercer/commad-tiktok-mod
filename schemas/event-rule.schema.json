@@ -236,7 +236,8 @@
             "lightning-effect",
             "place-cobweb",
             "remove-item",
-            "temporary-clear-inventory"
+            "temporary-clear-inventory",
+            "lightning"
           ]
         },
         "material": {
@@ -279,6 +280,22 @@
         "occupant-charged": {
           "type": "boolean",
           "description": "Set true when occupant is minecraft:creeper"
+        },
+        "damage": {
+          "type": "boolean",
+          "description": "Use real lightning (damage, fire and vanilla mob transformations). lightning defaults true; lightning-effect defaults false."
+        },
+        "duration-seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600,
+          "description": "0 means one burst; lightning defaults 60, lightning-effect defaults 0."
+        },
+        "interval-ticks": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 1200,
+          "default": 20
         }
       },
       "additionalProperties": true,
