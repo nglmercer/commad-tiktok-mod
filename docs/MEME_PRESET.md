@@ -29,11 +29,12 @@ the configured entity types, and raises older per-event/per-minute entity budget
 to at least 64 / 240. These changes are an **explicit operator opt-in**.
 Raw console command permissions are **not** required by the two new native Paper actions.
 
-## The 12 panel interactions
+## The 13 panel interactions
 
 | TikTok gift/event | Rule | Minecraft outcome |
 |---|---|---|
 | 150 likes | `meme-likes-zombie` | Spawn 1 zombie per threshold |
+| Any gift | `meme-gift-thanks-title` | Title naming the gift and the viewer, for every gift |
 | Rose (5655) | `meme-rose-charged-creeper-cage` | Small TNT cage with a charged creeper inside |
 | Confetti (5585) | `meme-confetti-tnt` | Request 30,000 TNT, bounded by server entity budgets |
 | Rosa (8913) | `meme-rosa-charged-creeper` | Spawn a charged creeper |

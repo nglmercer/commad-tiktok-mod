@@ -233,6 +233,7 @@
             "tnt-cage",
             "block-cage",
             "void-shaft",
+            "chunk-replace",
             "lightning-effect",
             "place-cobweb",
             "remove-item",
@@ -281,6 +282,35 @@
           "type": "boolean",
           "description": "Set true when occupant is minecraft:creeper"
         },
+        "from": {
+          "type": "string",
+          "description": "Only replace blocks of this material for chunk-replace; omit to replace every block"
+        },
+        "radius-chunks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "chunk-replace area: 0 is the player's chunk only, 1 is 3x3 chunks"
+        },
+        "min-y": {
+          "type": "integer",
+          "description": "Lowest Y modified by chunk-replace; defaults to the world minimum"
+        },
+        "max-y": {
+          "type": "integer",
+          "description": "Highest Y modified by chunk-replace; defaults to the world maximum"
+        },
+        "max-blocks": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "chunk-replace budget; 0 (default) is unlimited, otherwise the action is skipped when more blocks would change"
+        },
+        "blocks-per-tick": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096,
+          "description": "chunk-replace work spread per tick; defaults to 512"
+        },
         "damage": {
           "type": "boolean",
           "description": "Use real lightning (damage, fire and vanilla mob transformations). lightning defaults true; lightning-effect defaults false."
@@ -305,6 +335,23 @@
             "properties": {
               "type": {
                 "const": "block-cage"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "material"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "chunk-replace"
               }
             },
             "required": [

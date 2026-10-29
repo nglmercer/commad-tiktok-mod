@@ -180,3 +180,15 @@ rules:
         multiply-by-repeat: true
         max-effective-count: 3
         target: nearest-online
+
+  # Every completed gift streak shows who sent what. A rule without a
+  # match section fires for every gift.final event: {gift.name} is the
+  # gift and {viewer} the nickname (or @username when it is missing).
+  - id: meme-gift-thanks-title
+    enabled: true
+    trigger: gift.final
+    actions:
+      - type: title
+        target: all-online
+        title: "{gift.name}!"
+        subtitle: "Thanks {viewer}!"

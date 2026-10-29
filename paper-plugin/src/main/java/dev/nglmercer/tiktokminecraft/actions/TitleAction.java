@@ -2,6 +2,7 @@ package dev.nglmercer.tiktokminecraft.actions;
 
 import dev.nglmercer.tiktokminecraft.chat.ChatFormatter;
 import dev.nglmercer.tiktokminecraft.rules.ActionSpec;
+import dev.nglmercer.tiktokminecraft.rules.EventTemplate;
 import java.util.List;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.title.Title;
@@ -41,8 +42,10 @@ public final class TitleAction extends Action {
         if (players.isEmpty()) {
             return ActionResult.skipped("No eligible target");
         }
-        Component title = ChatFormatter.plain(spec.string("title", ""));
-        Component subtitle = ChatFormatter.plain(spec.string("subtitle", ""));
+        Component title = ChatFormatter.plain(ChatFormatter.truncate(
+                EventTemplate.render(spec.string("title", ""), context.event()), 256));
+        Component subtitle = ChatFormatter.plain(ChatFormatter.truncate(
+                EventTemplate.render(spec.string("subtitle", ""), context.event()), 512));
         Times times =
                 Times.times(
                         java.time.Duration.ofMillis(optionalInt(spec, "fade-in", 10) * 50L),

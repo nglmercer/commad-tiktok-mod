@@ -71,5 +71,60 @@ class MemeActionValidationTest {
         assertTrue(registry.contains("tnt-cage"));
         assertTrue(registry.contains("block-cage"));
         assertTrue(registry.contains("void-shaft"));
+        assertTrue(registry.contains("chunk-replace"));
+    }
+
+    @Test void chunkReplaceRangesNeedNoServerRegistry() {
+        Action action = new ChunkReplaceAction();
+        assertThrows(ActionException.class, () -> action.validate(
+                new ActionSpec("chunk-replace", Map.of()), context()));
+        assertThrows(ActionException.class, () -> action.validate(
+                new ActionSpec("chunk-replace",
+                        Map.of("material", "minecraft:air",
+                                "radius-chunks", 5)), context()));
+        assertThrows(ActionException.class, () -> action.validate(
+                new ActionSpec("chunk-replace",
+                        Map.of("material", "minecraft:air",
+                                "max-blocks", -1)), context()));
+        assertThrows(ActionException.class, () -> action.validate(
+                new ActionSpec("chunk-replace",
+                        Map.of("material", "minecraft:air",
+                                "blocks-per-tick", 0)), context()));
+        assertThrows(ActionException.class, () -> action.validate(
+                new ActionSpec("chunk-replace",
+                        Map.of("material", "minecraft:air",
+                                "blocks-per-tick", 5000)), context()));
+        assertThrows(ActionException.class, () -> action.validate(
+                new ActionSpec("chunk-replace",
+                        Map.of("material", "minecraft:air",
+                                "min-y", 100, "max-y", 50)), context()));
+        assertThrows(ActionException.class, () -> action.validate(
+                new ActionSpec("chunk-replace",
+                        Map.of("material", "minecraft:air",
+                                "restore-seconds", 999)), context()));
+    }
+
+    @Test void chunkReplaceDefaultsToUnlimitedBlocks() {
+        Action action = new ChunkReplaceAction();
+        assertDoesNotThrow(() -> action.validate(new ActionSpec("chunk-replace",
+                Map.of("material", "minecraft:air")), context()));
+        assertDoesNotThrow(() -> action.validate(new ActionSpec("chunk-replace",
+                Map.of("material", "minecraft:stone",
+                        "from", "minecraft:dirt",
+                        "radius-chunks", 1,
+                        "min-y", -64, "max-y", 320,
+                        "max-blocks", 0,
+                        "blocks-per-tick", 512,
+                        "restore-seconds", 30)), context()));
+        assertDoesNotThrow(() -> action.validate(new ActionSpec("chunk-replace",
+                Map.of("material", "minecraft:glass",
+                        "max-blocks", 1000000)), context()));
+        assertThrows(ActionException.class, () -> action.validate(
+                new ActionSpec("chunk-replace",
+                        Map.of("material", "minecraft:diamond_sword")), context()));
+        assertThrows(ActionException.class, () -> action.validate(
+                new ActionSpec("chunk-replace",
+                        Map.of("material", "minecraft:air",
+                                "from", "minecraft:diamond_sword")), context()));
     }
 }

@@ -53,3 +53,16 @@ rules:
       - type: sound
         sound: minecraft:entity.player.levelup
         target: all-online
+
+  # Every gift shows who sent what. A rule without a match section fires
+  # for every gift.final event; {gift.name} is the gift and {viewer} the
+  # nickname (or @username when it is missing).
+  - id: every-gift-title
+    enabled: false
+    trigger: gift.final
+
+    actions:
+      - type: title
+        target: all-online
+        title: "{gift.name}!"
+        subtitle: "Thanks {viewer}!"

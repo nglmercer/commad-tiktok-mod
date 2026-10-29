@@ -37,6 +37,7 @@ public final class ActionRegistry {
         // Both action types MUST share one owner of placed blocks.
         actions.put("block-cage", cage);
         register(new VoidShaftAction());
+        register(new ChunkReplaceAction());
         register(new LightningAction());
         register(new LightningAction("lightning", true));
         register(new PlaceCobwebAction());

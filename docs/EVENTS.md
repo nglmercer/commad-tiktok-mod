@@ -204,7 +204,7 @@ another.
 | Type | What it does |
 |---|---|
 | `broadcast` | Shows a message to every player. |
-| `title` | Shows a title and a subtitle. |
+| `title` | Shows a title and a subtitle. Both support `{field}` placeholders from the event. |
 | `sound` | Plays a sound. |
 | `particle` | Spawns particles. |
 | `spawn-entity` | Spawns an entity next to the target. |
@@ -212,6 +212,7 @@ another.
 | `tnt-cage` | Backward-compatible alias for `block-cage` with TNT as default. |
 | `prime-tnt` | Spawns a bounded number of ignited TNT entities. |
 | `void-shaft` | Opens a temporary shaft beneath the player. |
+| `chunk-replace` | Replaces blocks in the player's chunk (or 3x3 chunks) with one material. |
 | `give-item` | Gives an item to the target. |
 | `effect` | Applies a potion effect. |
 | `heal` | Heals the target. |
@@ -231,6 +232,27 @@ actions:
     args:
       count: 1
 ```
+
+### Event placeholders
+
+`title` and `subtitle` may contain `{field}` placeholders, using any
+documented event field or alias: `{gift.name}`, `{gift-name}`,
+`{user.nickname}`, `{nickname}`, `{user.uniqueId}` and so on. `{viewer}`
+is the friendly display name: the nickname, `@username` when no nickname
+is set, or `unknown`. A field the event does not carry renders as an
+empty string; an unknown name is left untouched so typos stay visible.
+
+```yaml
+actions:
+  - type: title
+    target: all-online
+    title: "{gift.name}!"
+    subtitle: "Thanks {viewer}!"
+```
+
+A rule without a `match` section fires for every event of its trigger,
+so one `gift.final` rule with this title covers all gifts. A function
+cannot do this: function arguments are fixed values, never event data.
 
 ### Configurable block cages
 
@@ -275,6 +297,44 @@ occupants and ignited TNT counts toward the entity rate limits.
 Temporary cages avoid container blocks and overlapping active cages.
 Restoration is best-effort; explosions, plugin crashes and unloaded
 chunks can leave terrain modifications behind.
+
+### Chunk replace
+
+A rule can convert or clean the chunk the selected player stands in.
+`material` is placed on every matching block: use `minecraft:air` to
+clean a chunk, or any other block to convert it.
+
+```yaml
+actions:
+  - type: chunk-replace
+    material: minecraft:air
+    target: nearest-online
+```
+
+Set `from` to convert one block type block by block while everything
+else is left alone:
+
+```yaml
+actions:
+  - type: chunk-replace
+    material: minecraft:stone
+    from: minecraft:dirt
+    target: nearest-online
+```
+
+Optional parameters: `radius-chunks` (`0` for the player's chunk only,
+`1` for 3x3 chunks, default `0`), `min-y` / `max-y` to limit the
+vertical range (default is the full world height), `blocks-per-tick`
+(`1`–`4096`, default `512`) to spread the work, and `restore-seconds`
+(`0`–`180`, default `0` for a permanent change).
+
+`max-blocks` is optional and unlimited by default (`0`). Set it above
+zero to make the action skip without changing anything when more blocks
+would change than the limit allows.
+
+Container blocks are never modified, unloaded chunks are skipped, and
+only loaded chunks are touched. Restoration is best-effort, like the
+other terrain pranks.
 
 `target` accepts `all-online`, `random-online`, `nearest-online`,
 `specific-player:<name>` and `specific-world:<name>`. When it is omitted,

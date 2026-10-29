@@ -176,6 +176,8 @@ public final class TikTokMinecraftPlugin extends JavaPlugin {
                     actionRegistry.get("tnt-cage")).restoreAll();
             ((dev.nglmercer.tiktokminecraft.actions.VoidShaftAction)
                     actionRegistry.get("void-shaft")).restoreAll();
+            ((dev.nglmercer.tiktokminecraft.actions.ChunkReplaceAction)
+                    actionRegistry.get("chunk-replace")).restoreAll();
         }
         if (tickTask != null) {
             tickTask.cancel();

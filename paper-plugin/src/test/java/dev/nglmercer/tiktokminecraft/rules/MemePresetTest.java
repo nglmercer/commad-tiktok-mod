@@ -51,7 +51,7 @@ class MemePresetTest {
 
     @Test void theMemePresetContainsAllActiveInteractions() throws Exception {
         Map<String, Map<?, ?>> rules = loadRules();
-        assertEquals(13, rules.size());
+        assertEquals(14, rules.size());
 
         assertGift(rules, "meme-rose-charged-creeper-cage", "5655", "block-cage");
         assertGift(rules, "meme-confetti-tnt", "5585", "prime-tnt");
@@ -81,6 +81,14 @@ class MemePresetTest {
         assertEquals(Boolean.TRUE, rose.get("occupant-charged"));
         assertEquals(Boolean.FALSE, rose.get("ignite"));
         assertEquals("gift.final", rules.get("meme-high-value-tnt-cage").get("trigger"));
+        Map<?, ?> thanks = rules.get("meme-gift-thanks-title");
+        assertNotNull(thanks, "meme-gift-thanks-title");
+        assertEquals("gift.final", thanks.get("trigger"));
+        assertTrue(!thanks.containsKey("match"),
+                "The thanks title fires for every gift");
+        assertEquals("title", firstAction(thanks).get("type"));
+        assertEquals("{gift.name}!", firstAction(thanks).get("title"));
+        assertEquals("Thanks {viewer}!", firstAction(thanks).get("subtitle"));
     }
 
     @Test void theNewActionsAreRegistered() {
@@ -91,5 +99,6 @@ class MemePresetTest {
                 "Cage aliases must share restoration state");
         assertTrue(registry.contains("void-shaft"));
         assertTrue(registry.contains("prime-tnt"));
+        assertTrue(registry.contains("chunk-replace"));
     }
 }
