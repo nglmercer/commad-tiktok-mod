@@ -194,14 +194,7 @@ public class BlockCageAction extends Action {
         if (name == null && "tnt-cage".equalsIgnoreCase(spec.type())) name = "minecraft:tnt";
         if (name == null)
             throw new ActionException("material is required for block-cage");
-        NamespacedKey key = ParticleAction.key(name);
-        if (key == null || !"minecraft".equals(key.getNamespace()))
-            throw new ActionException("Invalid vanilla block material: " + name);
-        Material material = Material.matchMaterial(key.getKey());
-        if (material == null || !material.isBlock() || material.isAir()
-                || material == Material.WATER || material == Material.LAVA)
-            throw new ActionException("Material is not a placeable solid block: " + name);
-        return material;
+        return BlockMaterials.resolve(name, "material", false, false);
     }
 
     private static void requireBoolean(ActionSpec spec, String key) throws ActionException {

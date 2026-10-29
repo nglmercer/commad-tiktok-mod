@@ -41,16 +41,21 @@ class MemeActionValidationTest {
         assertDoesNotThrow(() -> action.validate(new ActionSpec("block-cage",
                 Map.of("material", "minecraft:tnt", "radius", 1,
                         "occupant", "minecraft:creeper", "occupant-charged", true)), context()));
+        // Unknown names are rejected everywhere; item and air checks need
+        // the server registry, so off-server they defer to run time (the
+        // live server still rejects them at load).
         assertThrows(ActionException.class, () -> action.validate(new ActionSpec("block-cage",
+                Map.of("material", "minecraft:no_such_block_xyz")), context()));
+        assertDoesNotThrow(() -> action.validate(new ActionSpec("block-cage",
                 Map.of("material", "minecraft:diamond_sword")), context()));
+        assertDoesNotThrow(() -> action.validate(new ActionSpec("block-cage",
+                Map.of("material", "minecraft:air")), context()));
         assertThrows(ActionException.class, () -> action.validate(new ActionSpec("block-cage",
                 Map.of("material", "minecraft:obsidian", "ignite", true)), context()));
         assertThrows(ActionException.class, () -> action.validate(new ActionSpec("block-cage",
                 Map.of("material", "minecraft:glass", "occupant-charged", true)), context()));
         assertThrows(ActionException.class, () -> action.validate(new ActionSpec("block-cage",
                 Map.of("material", "minecraft:glass", "radius", 6)), context()));
-        assertThrows(ActionException.class, () -> action.validate(new ActionSpec("block-cage",
-                Map.of("material", "minecraft:air")), context()));
     }
 
     @Test void voidShaftBoundsPerTickOperationsAndBlockChanges() {
@@ -121,10 +126,14 @@ class MemeActionValidationTest {
                         "max-blocks", 1000000)), context()));
         assertThrows(ActionException.class, () -> action.validate(
                 new ActionSpec("chunk-replace",
-                        Map.of("material", "minecraft:diamond_sword")), context()));
+                        Map.of("material", "minecraft:no_such_block_xyz")), context()));
         assertThrows(ActionException.class, () -> action.validate(
                 new ActionSpec("chunk-replace",
                         Map.of("material", "minecraft:air",
-                                "from", "minecraft:diamond_sword")), context()));
+                                "from", "minecraft:no_such_block_xyz")), context()));
+        // Item checks need the server registry and defer to run time off-server.
+        assertDoesNotThrow(() -> action.validate(
+                new ActionSpec("chunk-replace",
+                        Map.of("material", "minecraft:diamond_sword")), context()));
     }
 }

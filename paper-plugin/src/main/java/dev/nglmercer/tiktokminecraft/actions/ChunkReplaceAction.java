@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
@@ -201,15 +200,7 @@ public final class ChunkReplaceAction extends Action {
 
     private static Material blockMaterial(String name, String param, boolean allowAir)
             throws ActionException {
-        NamespacedKey key = ParticleAction.key(name);
-        if (key == null || !"minecraft".equals(key.getNamespace()))
-            throw new ActionException("Invalid vanilla block material for '" + param + "': " + name);
-        Material material = Material.matchMaterial(key.getKey());
-        if (material == null || !material.isBlock()
-                || (!allowAir && material.isAir()))
-            throw new ActionException("Material is not a placeable block for '"
-                    + param + "': " + name);
-        return material;
+        return BlockMaterials.resolve(name, param, allowAir, true);
     }
 
     private static Integer optionalY(ActionSpec spec, String name) throws ActionException {
